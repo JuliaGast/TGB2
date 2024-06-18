@@ -115,6 +115,80 @@ def durendal_test(model, i_snap, test_data, data, device="cpu"):
     return tot_avgpr / num_rel, tot_mrr / num_rel
 
 
+def het_test(model, test_data, data, device="cpu"):
+
+    model.eval()
+
+    test_data = test_data.to(device)
+
+    edge_types = list(data.edge_index_dict.keys())
+
+    h_dict = model(test_data.x_dict, test_data.edge_index_dict, test_data)
+
+    tot_avgpr = 0
+    tot_mrr = 0
+
+    num_rel = 0
+
+    for edge_t in edge_types:
+
+        h = h_dict[edge_t]
+        pred_cont = torch.sigmoid(h).cpu().detach().numpy()
+
+        num_pos = len(test_data[edge_t].edge_label_index[0]) // 2
+        h_fake = h[num_pos:]
+
+        fake_preds = torch.sigmoid(h_fake).cpu().detach().numpy()
+        edge_label = test_data[edge_t].edge_label.cpu().detach().numpy()
+
+        if len(edge_label) > 0:
+            avgpr_score = average_precision_score(edge_label, pred_cont)
+            mrr_score = compute_mrr(pred_cont[:num_pos], fake_preds)
+
+            tot_avgpr += avgpr_score
+            tot_mrr += mrr_score
+            num_rel += 1
+
+    return tot_avgpr / num_rel, tot_mrr / num_rel
+
+
+def tnt_test(model, isnap, test_data, data, device="cpu"):
+
+    model.eval()
+
+    test_data = test_data.to(device)
+
+    edge_types = list(data.edge_index_dict.keys())
+
+    h_dict = model(test_data.x_dict, test_data.edge_index_dict, test_data, isnap)
+
+    tot_avgpr = 0
+    tot_mrr = 0
+
+    num_rel = 0
+
+    for edge_t in edge_types:
+
+        h = h_dict[edge_t]
+        pred_cont = torch.sigmoid(h).cpu().detach().numpy()
+
+        num_pos = len(test_data[edge_t].edge_label_index[0]) // 2
+        h_fake = h[num_pos:]
+
+        fake_preds = torch.sigmoid(h_fake).cpu().detach().numpy()
+        edge_label = test_data[edge_t].edge_label.cpu().detach().numpy()
+
+        if len(edge_label) > 0:
+            avgpr_score = average_precision_score(edge_label, pred_cont)
+            mrr_score = compute_mrr(pred_cont[:num_pos], fake_preds)
+
+            tot_avgpr += avgpr_score
+            tot_mrr += mrr_score
+            num_rel += 1
+
+    return tot_avgpr / num_rel, tot_mrr / num_rel
+
+
 def durendal_train_single_snapshot(
     model,
     data,
@@ -219,7 +293,7 @@ def durendal_train_single_snapshot(
 
 
 """
-Change the function to only do the training part
+Change the durendal_train_single_snapshot function to only do the training part
 """
 
 
@@ -316,6 +390,554 @@ def durendal_train_single_snapshot_only_train(
     return best_model, best_past_dict_1, best_past_dict_2, optimizer
 
 
+def regcn_train_single_snapshot(
+    model,
+    data,
+    i_snap,
+    train_data,
+    val_data,
+    test_data,
+    past_dict_1,
+    past_dict_2,
+    past_r,
+    optimizer,
+    device="cpu",
+    num_epochs=50,
+    verbose=False,
+):
+
+    mrr_val_max = 0
+    avgpr_val_max = 0
+    best_model = model
+    train_data = train_data.to(device)
+    best_epoch = -1
+    best_past_dict_1 = {}
+    best_past_dict_2 = {}
+    best_past_r = None
+
+    tol = 5e-2
+
+    edge_types = list(data.edge_index_dict.keys())
+
+    for epoch in range(num_epochs):
+        model.train()
+        ## Note
+        ## 1. Zero grad the optimizer
+        ## 2. Compute loss and backpropagate
+        ## 3. Update the model parameters
+        optimizer.zero_grad()
+
+        pred_dict, past_dict_1, past_dict_2, past_r = model(
+            train_data.x_dict,
+            train_data.edge_index_dict,
+            train_data,
+            i_snap,
+            past_dict_1,
+            past_dict_2,
+            past_r,
+        )
+
+        preds = torch.Tensor()
+        edge_labels = torch.Tensor()
+        for edge_t in edge_types:
+            preds = torch.cat((preds, pred_dict[edge_t]), -1)
+            edge_labels = torch.cat(
+                (edge_labels, train_data[edge_t].edge_label.type_as(pred_dict[edge_t])),
+                -1,
+            )
+
+        # compute loss function based on all edge types
+        loss = model.loss(preds, edge_labels)
+        loss = torch.autograd.Variable(loss, requires_grad=True)
+
+        loss.backward(retain_graph=True)  # Derive gradients.
+        optimizer.step()  # Update parameters based on gradients.
+
+        ##########################################
+
+        log = "Epoch: {:03d}\n AVGPR Train: {:.4f}, Val: {:.4f}, Test: {:.4f}\n MRR Train: {:.4f}, Val: {:.4f}, Test: {:.4f}\n F1-Score Train: {:.4f}, Val: {:.4f}, Test: {:.4f}\n Loss: {}"
+        avgpr_score_val, mrr_val = durendal_test(model, i_snap, val_data, data, device)
+
+        """
+        if mrr_val_max-tol < mrr_val:
+            mrr_val_max = mrr_val
+            best_epoch = epoch
+            best_current_embeddings = current_embeddings
+            best_model = copy.deepcopy(model)
+        else:
+            break
+        
+        #print(f'Epoch: {epoch} done')
+            
+        """
+        gc.collect()
+        if avgpr_val_max - tol <= avgpr_score_val:
+            avgpr_val_max = avgpr_score_val
+            best_epoch = epoch
+            best_past_dict_1 = past_dict_1
+            best_past_dict_2 = past_dict_2
+            best_past_r = past_r
+            best_model = model
+        else:
+            break
+
+    avgpr_score_test, mrr_test = durendal_test(model, i_snap, test_data, data, device)
+
+    if verbose:
+        print(f"Best Epoch: {best_epoch}")
+    # print(f'Best Epoch: {best_epoch}')
+
+    return (
+        best_model,
+        avgpr_score_test,
+        mrr_test,
+        best_past_dict_1,
+        best_past_dict_2,
+        best_past_r,
+        optimizer,
+    )
+
+
+"""
+Change the regcn_train_single_snapshot function to only do the training part
+"""
+
+
+def regcn_train_single_snapshot_only_train(
+    model,
+    data,
+    i_snap,
+    train_data,
+    val_data,
+    past_dict_1,
+    past_dict_2,
+    past_r,
+    optimizer,
+    device="cpu",
+    num_epochs=50,
+    verbose=False,
+):
+
+    mrr_val_max = 0
+    avgpr_val_max = 0
+    best_model = model
+    train_data = train_data.to(device)
+    best_epoch = -1
+    best_past_dict_1 = {}
+    best_past_dict_2 = {}
+    best_past_r = None
+
+    tol = 5e-2
+
+    edge_types = list(data.edge_index_dict.keys())
+
+    for epoch in range(num_epochs):
+        model.train()
+        ## Note
+        ## 1. Zero grad the optimizer
+        ## 2. Compute loss and backpropagate
+        ## 3. Update the model parameters
+        optimizer.zero_grad()
+
+        pred_dict, past_dict_1, past_dict_2, past_r = model(
+            train_data.x_dict,
+            train_data.edge_index_dict,
+            train_data,
+            i_snap,
+            past_dict_1,
+            past_dict_2,
+            past_r,
+        )
+
+        preds = torch.Tensor()
+        edge_labels = torch.Tensor()
+        for edge_t in edge_types:
+            preds = torch.cat((preds, pred_dict[edge_t]), -1)
+            edge_labels = torch.cat(
+                (edge_labels, train_data[edge_t].edge_label.type_as(pred_dict[edge_t])),
+                -1,
+            )
+
+        # compute loss function based on all edge types
+        loss = model.loss(preds, edge_labels)
+        loss = torch.autograd.Variable(loss, requires_grad=True)
+
+        loss.backward(retain_graph=True)  # Derive gradients.
+        optimizer.step()  # Update parameters based on gradients.
+
+        ##########################################
+
+        log = "Epoch: {:03d}\n AVGPR Train: {:.4f}, Val: {:.4f}, Test: {:.4f}\n MRR Train: {:.4f}, Val: {:.4f}, Test: {:.4f}\n F1-Score Train: {:.4f}, Val: {:.4f}, Test: {:.4f}\n Loss: {}"
+        avgpr_score_val, mrr_val = durendal_test(model, i_snap, val_data, data, device)
+
+        """
+        if mrr_val_max-tol < mrr_val:
+            mrr_val_max = mrr_val
+            best_epoch = epoch
+            best_current_embeddings = current_embeddings
+            best_model = copy.deepcopy(model)
+        else:
+            break
+        
+        #print(f'Epoch: {epoch} done')
+            
+        """
+        gc.collect()
+        if avgpr_val_max - tol <= avgpr_score_val:
+            avgpr_val_max = avgpr_score_val
+            best_epoch = epoch
+            best_past_dict_1 = past_dict_1
+            best_past_dict_2 = past_dict_2
+            best_past_r = past_r
+            best_model = model
+        else:
+            break
+
+    if verbose:
+        print(f"Best Epoch: {best_epoch}")
+    # print(f'Best Epoch: {best_epoch}')
+
+    return best_model, best_past_dict_1, best_past_dict_2, best_past_r, optimizer
+
+
+def het_train_single_snapshot(
+    model,
+    data,
+    train_data,
+    val_data,
+    test_data,
+    optimizer,
+    device="cpu",
+    num_epochs=50,
+    verbose=False,
+):
+
+    mrr_val_max = 0
+    avgpr_val_max = 0
+    best_model = model
+    train_data = train_data.to(device)
+    best_epoch = -1
+
+    tol = 5e-2
+
+    edge_types = list(data.edge_index_dict.keys())
+
+    for epoch in range(num_epochs):
+        model.train()
+        ## Note
+        ## 1. Zero grad the optimizer
+        ## 2. Compute loss and backpropagate
+        ## 3. Update the model parameters
+        optimizer.zero_grad()
+
+        pred_dict = model(train_data.x_dict, train_data.edge_index_dict, train_data)
+
+        preds = torch.Tensor()
+        edge_labels = torch.Tensor()
+        for edge_t in edge_types:
+            preds = torch.cat((preds, pred_dict[edge_t]), -1)
+            edge_labels = torch.cat(
+                (edge_labels, train_data[edge_t].edge_label.type_as(pred_dict[edge_t])),
+                -1,
+            )
+
+        # compute loss function based on all edge types
+        loss = model.loss(preds, edge_labels)
+        loss = torch.autograd.Variable(loss, requires_grad=True)
+
+        loss.backward(retain_graph=True)  # Derive gradients.
+        optimizer.step()  # Update parameters based on gradients.
+
+        ##########################################
+
+        log = "Epoch: {:03d}\n AVGPR Train: {:.4f}, Val: {:.4f}, Test: {:.4f}\n MRR Train: {:.4f}, Val: {:.4f}, Test: {:.4f}\n F1-Score Train: {:.4f}, Val: {:.4f}, Test: {:.4f}\n Loss: {}"
+        avgpr_score_val, mrr_val = het_test(model, val_data, data, device)
+
+        """
+        if mrr_val_max-tol < mrr_val:
+            mrr_val_max = mrr_val
+            best_epoch = epoch
+            best_current_embeddings = current_embeddings
+            best_model = copy.deepcopy(model)
+        else:
+            break
+        
+        #print(f'Epoch: {epoch} done')
+            
+        """
+        gc.collect()
+
+        if avgpr_val_max - tol <= avgpr_score_val:
+            avgpr_val_max = avgpr_score_val
+            best_epoch = epoch
+            best_model = model
+        else:
+            break
+
+    avgpr_score_test, mrr_test = het_test(model, test_data, data, device)
+
+    if verbose:
+        print(f"Best Epoch: {best_epoch}")
+    # print(f'Best Epoch: {best_epoch}')
+
+    return best_model, avgpr_score_test, mrr_test, optimizer
+
+
+"""
+Change the het_train_single_snapshot function to only do the training part
+"""
+
+
+def het_train_single_snapshot_only_training(
+    model,
+    data,
+    train_data,
+    val_data,
+    optimizer,
+    device="cpu",
+    num_epochs=50,
+    verbose=False,
+):
+
+    mrr_val_max = 0
+    avgpr_val_max = 0
+    best_model = model
+    train_data = train_data.to(device)
+    best_epoch = -1
+
+    tol = 5e-2
+
+    edge_types = list(data.edge_index_dict.keys())
+
+    for epoch in range(num_epochs):
+        model.train()
+        ## Note
+        ## 1. Zero grad the optimizer
+        ## 2. Compute loss and backpropagate
+        ## 3. Update the model parameters
+        optimizer.zero_grad()
+
+        pred_dict = model(train_data.x_dict, train_data.edge_index_dict, train_data)
+
+        preds = torch.Tensor()
+        edge_labels = torch.Tensor()
+        for edge_t in edge_types:
+            preds = torch.cat((preds, pred_dict[edge_t]), -1)
+            edge_labels = torch.cat(
+                (edge_labels, train_data[edge_t].edge_label.type_as(pred_dict[edge_t])),
+                -1,
+            )
+
+        # compute loss function based on all edge types
+        loss = model.loss(preds, edge_labels)
+        loss = torch.autograd.Variable(loss, requires_grad=True)
+
+        loss.backward(retain_graph=True)  # Derive gradients.
+        optimizer.step()  # Update parameters based on gradients.
+
+        ##########################################
+
+        log = "Epoch: {:03d}\n AVGPR Train: {:.4f}, Val: {:.4f}, Test: {:.4f}\n MRR Train: {:.4f}, Val: {:.4f}, Test: {:.4f}\n F1-Score Train: {:.4f}, Val: {:.4f}, Test: {:.4f}\n Loss: {}"
+        avgpr_score_val, mrr_val = het_test(model, val_data, data, device)
+
+        """
+        if mrr_val_max-tol < mrr_val:
+            mrr_val_max = mrr_val
+            best_epoch = epoch
+            best_current_embeddings = current_embeddings
+            best_model = copy.deepcopy(model)
+        else:
+            break
+        
+        #print(f'Epoch: {epoch} done')
+            
+        """
+        gc.collect()
+
+        if avgpr_val_max - tol <= avgpr_score_val:
+            avgpr_val_max = avgpr_score_val
+            best_epoch = epoch
+            best_model = model
+        else:
+            break
+
+    if verbose:
+        print(f"Best Epoch: {best_epoch}")
+    # print(f'Best Epoch: {best_epoch}')
+
+    return best_model, optimizer
+
+
+def tnt_train_single_snapshot(
+    model,
+    data,
+    isnap,
+    train_data,
+    val_data,
+    test_data,
+    optimizer,
+    device="cpu",
+    num_epochs=50,
+    verbose=False,
+):
+
+    mrr_val_max = 0
+    avgpr_val_max = 0
+    best_model = model
+    train_data = train_data.to(device)
+    best_epoch = -1
+
+    tol = 5e-2
+
+    edge_types = list(data.edge_index_dict.keys())
+
+    for epoch in range(num_epochs):
+        model.train()
+        ## Note
+        ## 1. Zero grad the optimizer
+        ## 2. Compute loss and backpropagate
+        ## 3. Update the model parameters
+        optimizer.zero_grad()
+
+        pred_dict = model(
+            train_data.x_dict, train_data.edge_index_dict, train_data, isnap
+        )
+
+        preds = torch.Tensor()
+        edge_labels = torch.Tensor()
+        for edge_t in edge_types:
+            preds = torch.cat((preds, pred_dict[edge_t]), -1)
+            edge_labels = torch.cat(
+                (edge_labels, train_data[edge_t].edge_label.type_as(pred_dict[edge_t])),
+                -1,
+            )
+
+        # compute loss function based on all edge types
+        loss = model.loss(preds, edge_labels)
+        loss = torch.autograd.Variable(loss, requires_grad=True)
+
+        loss.backward(retain_graph=True)  # Derive gradients.
+        optimizer.step()  # Update parameters based on gradients.
+
+        ##########################################
+
+        log = "Epoch: {:03d}\n AVGPR Train: {:.4f}, Val: {:.4f}, Test: {:.4f}\n MRR Train: {:.4f}, Val: {:.4f}, Test: {:.4f}\n F1-Score Train: {:.4f}, Val: {:.4f}, Test: {:.4f}\n Loss: {}"
+        avgpr_score_val, mrr_val = tnt_test(model, isnap, val_data, data, device)
+
+        """
+        if mrr_val_max-tol < mrr_val:
+            mrr_val_max = mrr_val
+            best_epoch = epoch
+            best_current_embeddings = current_embeddings
+            best_model = copy.deepcopy(model)
+        else:
+            break
+        
+        #print(f'Epoch: {epoch} done')
+            
+        """
+        if avgpr_val_max - tol <= avgpr_score_val:
+            avgpr_val_max = avgpr_score_val
+            best_epoch = epoch
+            best_model = model
+        else:
+            break
+
+    avgpr_score_test, mrr_test = tnt_test(model, isnap, test_data, data, device)
+
+    if verbose:
+        print(f"Best Epoch: {best_epoch}")
+    # print(f'Best Epoch: {best_epoch}')
+
+    return best_model, avgpr_score_test, mrr_test, optimizer
+
+
+"""
+Change the het_train_single_snapshot function to only do the training part
+"""
+
+
+def tnt_train_single_snapshot_only_training(
+    model,
+    data,
+    isnap,
+    train_data,
+    val_data,
+    optimizer,
+    device="cpu",
+    num_epochs=50,
+    verbose=False,
+):
+
+    mrr_val_max = 0
+    avgpr_val_max = 0
+    best_model = model
+    train_data = train_data.to(device)
+    best_epoch = -1
+
+    tol = 5e-2
+
+    edge_types = list(data.edge_index_dict.keys())
+
+    for epoch in range(num_epochs):
+        model.train()
+        ## Note
+        ## 1. Zero grad the optimizer
+        ## 2. Compute loss and backpropagate
+        ## 3. Update the model parameters
+        optimizer.zero_grad()
+
+        pred_dict = model(
+            train_data.x_dict, train_data.edge_index_dict, train_data, isnap
+        )
+
+        preds = torch.Tensor()
+        edge_labels = torch.Tensor()
+        for edge_t in edge_types:
+            preds = torch.cat((preds, pred_dict[edge_t]), -1)
+            edge_labels = torch.cat(
+                (edge_labels, train_data[edge_t].edge_label.type_as(pred_dict[edge_t])),
+                -1,
+            )
+
+        # compute loss function based on all edge types
+        loss = model.loss(preds, edge_labels)
+        loss = torch.autograd.Variable(loss, requires_grad=True)
+
+        loss.backward(retain_graph=True)  # Derive gradients.
+        optimizer.step()  # Update parameters based on gradients.
+
+        ##########################################
+
+        log = "Epoch: {:03d}\n AVGPR Train: {:.4f}, Val: {:.4f}, Test: {:.4f}\n MRR Train: {:.4f}, Val: {:.4f}, Test: {:.4f}\n F1-Score Train: {:.4f}, Val: {:.4f}, Test: {:.4f}\n Loss: {}"
+        avgpr_score_val, mrr_val = tnt_test(model, isnap, val_data, data, device)
+
+        """
+        if mrr_val_max-tol < mrr_val:
+            mrr_val_max = mrr_val
+            best_epoch = epoch
+            best_current_embeddings = current_embeddings
+            best_model = copy.deepcopy(model)
+        else:
+            break
+        
+        #print(f'Epoch: {epoch} done')
+            
+        """
+        if avgpr_val_max - tol <= avgpr_score_val:
+            avgpr_val_max = avgpr_score_val
+            best_epoch = epoch
+            best_model = model
+        else:
+            break
+
+    if verbose:
+        print(f"Best Epoch: {best_epoch}")
+    # print(f'Best Epoch: {best_epoch}')
+
+    return best_model, optimizer
+
+
 """
 Modified the training mode to only train the model
 """
@@ -400,9 +1022,530 @@ def training_durendal_uta(snapshots, hidden_conv_1, hidden_conv_2, device="cpu")
 
         gc.collect()
 
-    print("DURENDAL Training Completed")
+    print("DURENDAL UTA Training Completed")
 
-    return durendal, past_dict_1, past_dict_2, durendalopt
+    return durendal, (past_dict_1, past_dict_2), durendalopt
+
+
+def training_durendal_atu(snapshots, hidden_conv_1, hidden_conv_2, device="cpu"):
+    num_snap = len(snapshots)
+    hetdata = copy.deepcopy(snapshots[0])
+    edge_types = list(hetdata.edge_index_dict.keys())
+
+    lr = 0.001
+    weight_decay = 5e-3
+
+    in_channels = {node: len(v[0]) for node, v in hetdata.x_dict.items()}
+    num_nodes = {node: len(v) for node, v in hetdata.x_dict.items()}
+
+    # ATU
+    atu = RATU(
+        in_channels,
+        num_nodes,
+        hetdata.metadata(),
+        hidden_conv_1=hidden_conv_1,
+        hidden_conv_2=hidden_conv_2,
+    )
+    atu.reset_parameters()
+    atuopt = torch.optim.Adagrad(
+        params=atu.parameters(), lr=1e-1, weight_decay=weight_decay
+    )
+
+    past_dict_1_atu = {}
+    for node in hetdata.x_dict.keys():
+        past_dict_1_atu[node] = {}
+    for src, r, dst in hetdata.edge_index_dict.keys():
+        past_dict_1_atu[src][r] = torch.Tensor(
+            [[0 for j in range(hidden_conv_1)] for i in range(hetdata[src].num_nodes)]
+        )
+        past_dict_1_atu[dst][r] = torch.Tensor(
+            [[0 for j in range(hidden_conv_1)] for i in range(hetdata[dst].num_nodes)]
+        )
+
+    past_dict_2_atu = {}
+    for node in hetdata.x_dict.keys():
+        past_dict_2_atu[node] = {}
+    for src, r, dst in hetdata.edge_index_dict.keys():
+        past_dict_2_atu[src][r] = torch.Tensor(
+            [[0 for j in range(hidden_conv_2)] for i in range(hetdata[src].num_nodes)]
+        )
+        past_dict_2_atu[dst][r] = torch.Tensor(
+            [[0 for j in range(hidden_conv_2)] for i in range(hetdata[dst].num_nodes)]
+        )
+
+    for i in range(num_snap - 1):
+        # CREATE TRAIN + VAL + TEST SET FOR THE CURRENT SNAP
+        snapshot = copy.deepcopy(snapshots[i])
+
+        link_split = RandomLinkSplit(num_val=0.0, num_test=0.20, edge_types=edge_types)
+
+        het_train_data, _, het_val_data = link_split(snapshot)
+
+        # het_test_data = copy.deepcopy(snapshots[i+1])
+        # future_link_split = RandomLinkSplit(num_val=0, num_test=0, edge_types = edge_types) #useful only for negative sampling
+        # het_test_data, _, _ = future_link_split(het_test_data)
+
+        atu, past_dict_1_atu, past_dict_2_atu, atuopt = (
+            durendal_train_single_snapshot_only_train(
+                atu,
+                snapshot,
+                i,
+                het_train_data,
+                het_val_data,
+                past_dict_1_atu,
+                past_dict_2_atu,
+                atuopt,
+            )
+        )
+
+        # SAVE AND DISPLAY EVALUATION
+        print(f"Snapshot: {i} completed\n")
+
+        gc.collect()
+
+    print("DURENDAL ATU Training Completed")
+
+    return atu, (past_dict_1_atu, past_dict_2_atu), atuopt
+
+
+def training_dyhan(snapshots, hidden_conv_1, hidden_conv_2, device="cpu"):
+    num_snap = len(snapshots)
+    hetdata = copy.deepcopy(snapshots[0])
+    edge_types = list(hetdata.edge_index_dict.keys())
+
+    lr = 0.001
+    weight_decay = 5e-3
+
+    in_channels = {node: len(v[0]) for node, v in hetdata.x_dict.items()}
+    num_nodes = {node: len(v) for node, v in hetdata.x_dict.items()}
+
+    # DyHAN
+    dyhan = DyHAN(
+        in_channels,
+        num_nodes,
+        hetdata.metadata(),
+        hidden_conv_1=hidden_conv_1,
+        hidden_conv_2=hidden_conv_2,
+    )
+
+    dyhan.reset_parameters()
+
+    dyhanopt = torch.optim.Adam(
+        params=dyhan.parameters(), lr=lr, weight_decay=weight_decay
+    )
+
+    past_dict_1_dyhan = {}
+    for node in hetdata.x_dict.keys():
+        past_dict_1_dyhan[node] = {}
+    for src, r, dst in hetdata.edge_index_dict.keys():
+        past_dict_1_dyhan[src][r] = torch.Tensor(
+            [[0 for j in range(hidden_conv_1)] for i in range(hetdata[src].num_nodes)]
+        )
+        past_dict_1_dyhan[dst][r] = torch.Tensor(
+            [[0 for j in range(hidden_conv_1)] for i in range(hetdata[dst].num_nodes)]
+        )
+
+    past_dict_2_dyhan = {}
+    for node in hetdata.x_dict.keys():
+        past_dict_2_dyhan[node] = {}
+    for src, r, dst in hetdata.edge_index_dict.keys():
+        past_dict_2_dyhan[src][r] = torch.Tensor(
+            [[0 for j in range(hidden_conv_2)] for i in range(hetdata[src].num_nodes)]
+        )
+        past_dict_2_dyhan[dst][r] = torch.Tensor(
+            [[0 for j in range(hidden_conv_2)] for i in range(hetdata[dst].num_nodes)]
+        )
+
+    for i in range(num_snap - 1):
+        # CREATE TRAIN + VAL + TEST SET FOR THE CURRENT SNAP
+        snapshot = copy.deepcopy(snapshots[i])
+
+        link_split = RandomLinkSplit(num_val=0.0, num_test=0.20, edge_types=edge_types)
+
+        het_train_data, _, het_val_data = link_split(snapshot)
+
+        # het_test_data = copy.deepcopy(snapshots[i+1])
+        # future_link_split = RandomLinkSplit(num_val=0, num_test=0, edge_types = edge_types) #useful only for negative sampling
+        # het_test_data, _, _ = future_link_split(het_test_data)
+
+        # TRAIN AND TEST THE MODEL FOR THE CURRENT SNAP
+        dyhan, past_dict_1_dyhan, past_dict_2_dyhan, dyhanopt = (
+            durendal_train_single_snapshot_only_train(
+                dyhan,
+                snapshot,
+                i,
+                het_train_data,
+                het_val_data,
+                past_dict_1_dyhan,
+                past_dict_2_dyhan,
+                dyhanopt,
+                num_epochs=3,
+            )
+        )
+
+        # SAVE AND DISPLAY EVALUATION
+        print(f"Snapshot: {i} completed\n")
+        gc.collect()
+
+    print("DyHAN Training Completed")
+
+    return dyhan, (past_dict_1_dyhan, past_dict_2_dyhan), dyhanopt
+
+
+def training_htgnn(snapshots, hidden_conv_1, hidden_conv_2, device="cpu"):
+    num_snap = len(snapshots)
+    hetdata = copy.deepcopy(snapshots[0])
+    edge_types = list(hetdata.edge_index_dict.keys())
+
+    lr = 0.001
+    weight_decay = 5e-3
+
+    in_channels = {node: len(v[0]) for node, v in hetdata.x_dict.items()}
+    num_nodes = {node: len(v) for node, v in hetdata.x_dict.items()}
+
+    homdata = copy.deepcopy(snapshots[0]).to_homogeneous()
+    in_channels_homo = homdata.x.size(1)
+    num_nodes_homo = homdata.x.size(0)
+    homdata = None
+
+    # HTGNN
+    htgnn = HTGNN(
+        in_channels,
+        in_channels_homo,
+        num_nodes,
+        hetdata.metadata(),
+        hidden_conv_1=hidden_conv_1,
+        hidden_conv_2=hidden_conv_2,
+    )
+    htgnn.reset_parameters()
+    htgnnopt = torch.optim.Adagrad(
+        params=htgnn.parameters(), lr=1e-1, weight_decay=weight_decay
+    )
+
+    past_dict_1_htgnn = {}
+    for node in hetdata.x_dict.keys():
+        past_dict_1_htgnn[node] = {}
+    for src, r, dst in hetdata.edge_index_dict.keys():
+        past_dict_1_htgnn[src][r] = torch.Tensor(
+            [[0 for j in range(hidden_conv_1)] for i in range(hetdata[src].num_nodes)]
+        )
+        past_dict_1_htgnn[dst][r] = torch.Tensor(
+            [[0 for j in range(hidden_conv_1)] for i in range(hetdata[dst].num_nodes)]
+        )
+
+    past_dict_2_htgnn = {}
+    for node in hetdata.x_dict.keys():
+        past_dict_2_htgnn[node] = {}
+    for src, r, dst in hetdata.edge_index_dict.keys():
+        past_dict_2_htgnn[src][r] = torch.Tensor(
+            [[0 for j in range(hidden_conv_2)] for i in range(hetdata[src].num_nodes)]
+        )
+        past_dict_2_htgnn[dst][r] = torch.Tensor(
+            [[0 for j in range(hidden_conv_2)] for i in range(hetdata[dst].num_nodes)]
+        )
+
+    for i in range(num_snap - 1):
+        # CREATE TRAIN + VAL + TEST SET FOR THE CURRENT SNAP
+        snapshot = copy.deepcopy(snapshots[i])
+
+        link_split = RandomLinkSplit(num_val=0.0, num_test=0.20, edge_types=edge_types)
+
+        het_train_data, _, het_val_data = link_split(snapshot)
+
+        # het_test_data = copy.deepcopy(snapshots[i+1])
+        # future_link_split = RandomLinkSplit(num_val=0, num_test=0, edge_types = edge_types) #useful only for negative sampling
+        # het_test_data, _, _ = future_link_split(het_test_data)
+
+        htgnn, past_dict_1_htgnn, past_dict_2_htgnn, htgnnopt = (
+            durendal_train_single_snapshot_only_train(
+                htgnn,
+                snapshot,
+                i,
+                het_train_data,
+                het_val_data,
+                past_dict_1_htgnn,
+                past_dict_2_htgnn,
+                htgnnopt,
+            )
+        )
+
+        # SAVE AND DISPLAY EVALUATION
+        print(f"Snapshot: {i} completed\n")
+
+        gc.collect()
+
+    print("HTGNN Training Completed")
+
+    return htgnn, (past_dict_1_htgnn, past_dict_2_htgnn), htgnnopt
+
+
+def training_regcn(snapshots, hidden_conv_1, hidden_conv_2, output_conv, device="cpu"):
+    num_snap = len(snapshots)
+    hetdata = copy.deepcopy(snapshots[0])
+    edge_types = list(hetdata.edge_index_dict.keys())
+
+    lr = 0.001
+    weight_decay = 5e-3
+
+    in_channels = {node: len(v[0]) for node, v in hetdata.x_dict.items()}
+    num_nodes = {node: len(v) for node, v in hetdata.x_dict.items()}
+    homdata = copy.deepcopy(snapshots[0]).to_homogeneous()
+    in_channels_homo = homdata.x.size(1)
+    num_nodes_homo = homdata.x.size(0)
+    homdata = None
+
+    # ATU
+    regcn = REGCN(
+        in_channels_homo,
+        num_nodes,
+        hetdata.metadata(),
+        hidden_conv_1=hidden_conv_1,
+        hidden_conv_2=hidden_conv_2,
+        output_conv=output_conv,
+    )
+
+    regcn.reset_parameters()
+    regcnopt = torch.optim.Adagrad(
+        params=regcn.parameters(), lr=1e-1, weight_decay=weight_decay
+    )
+
+    past_dict_1_regcn = {}
+    for node in hetdata.x_dict.keys():
+        past_dict_1_regcn[node] = {}
+    for src, r, dst in hetdata.edge_index_dict.keys():
+        past_dict_1_regcn[src][r] = torch.Tensor(
+            [[0 for j in range(hidden_conv_1)] for i in range(hetdata[src].num_nodes)]
+        )
+        past_dict_1_regcn[dst][r] = torch.Tensor(
+            [[0 for j in range(hidden_conv_1)] for i in range(hetdata[dst].num_nodes)]
+        )
+
+    past_dict_2_regcn = {}
+    for node in hetdata.x_dict.keys():
+        past_dict_2_regcn[node] = {}
+    for src, r, dst in hetdata.edge_index_dict.keys():
+        past_dict_2_regcn[src][r] = torch.Tensor(
+            [[0 for j in range(hidden_conv_2)] for i in range(hetdata[src].num_nodes)]
+        )
+        past_dict_2_regcn[dst][r] = torch.Tensor(
+            [[0 for j in range(hidden_conv_2)] for i in range(hetdata[dst].num_nodes)]
+        )
+
+    past_r = torch.randn(num_nodes_homo, hidden_conv_2)
+
+    for i in range(num_snap - 1):
+        # CREATE TRAIN + VAL + TEST SET FOR THE CURRENT SNAP
+        snapshot = copy.deepcopy(snapshots[i])
+
+        link_split = RandomLinkSplit(num_val=0.0, num_test=0.20, edge_types=edge_types)
+
+        het_train_data, _, het_val_data = link_split(snapshot)
+
+        # het_test_data = copy.deepcopy(snapshots[i+1])
+        # future_link_split = RandomLinkSplit(num_val=0, num_test=0, edge_types = edge_types) #useful only for negative sampling
+        # het_test_data, _, _ = future_link_split(het_test_data)
+
+        regcn, past_dict_1_regcn, past_dict_2_regcn, past_r, regcnopt = (
+            regcn_train_single_snapshot_only_train(
+                regcn,
+                snapshot,
+                i,
+                het_train_data,
+                het_val_data,
+                past_dict_1_regcn,
+                past_dict_2_regcn,
+                past_r,
+                regcnopt,
+            )
+        )
+
+        # SAVE AND DISPLAY EVALUATION
+        print(f"Snapshot: {i} completed\n")
+
+        gc.collect()
+
+    print("RE-GCN Training Completed")
+
+    return regcn, (past_dict_1_regcn, past_dict_2_regcn, past_r), regcnopt
+
+
+def training_han(snapshots, hidden_conv_1, hidden_conv_2, device="cpu"):
+    num_snap = len(snapshots)
+    hetdata = copy.deepcopy(snapshots[0])
+    edge_types = list(hetdata.edge_index_dict.keys())
+
+    lr = 0.001
+    weight_decay = 5e-3
+
+    in_channels = {node: len(v[0]) for node, v in hetdata.x_dict.items()}
+    num_nodes = {node: len(v) for node, v in hetdata.x_dict.items()}
+
+    # HAN
+    han = RHAN(in_channels, hidden_conv_1, hidden_conv_2, hetdata.metadata())
+    han.reset_parameters()
+    hanopt = torch.optim.Adam(params=han.parameters(), lr=lr, weight_decay=weight_decay)
+
+    for i in range(num_snap - 1):
+        # CREATE TRAIN + VAL + TEST SET FOR THE CURRENT SNAP
+        snapshot = copy.deepcopy(snapshots[i])
+
+        link_split = RandomLinkSplit(num_val=0.0, num_test=0.20, edge_types=edge_types)
+
+        het_train_data, _, het_val_data = link_split(snapshot)
+
+        # het_test_data = copy.deepcopy(snapshots[i+1])
+        # future_link_split = RandomLinkSplit(num_val=0, num_test=0, edge_types = edge_types) #useful only for negative sampling
+        # het_test_data, _, _ = future_link_split(het_test_data)
+
+        # TRAIN AND TEST THE MODEL FOR THE CURRENT SNAP
+        han, hanopt = het_train_single_snapshot_only_training(
+            han, snapshot, het_train_data, het_val_data, hanopt
+        )
+
+        # SAVE AND DISPLAY EVALUATION
+        print(f"Snapshot: {i} completed\n")
+
+        gc.collect()
+
+    print("HAN Training Completed")
+
+    return han, [], hanopt
+
+
+def training_hev(snapshots, hidden_conv_1, hidden_conv_2, device="cpu"):
+    num_snap = len(snapshots)
+    hetdata = copy.deepcopy(snapshots[0])
+    edge_types = list(hetdata.edge_index_dict.keys())
+
+    lr = 0.001
+    weight_decay = 5e-3
+
+    in_channels = {node: len(v[0]) for node, v in hetdata.x_dict.items()}
+    num_nodes = {node: len(v) for node, v in hetdata.x_dict.items()}
+
+    homdata = copy.deepcopy(snapshots[0]).to_homogeneous()
+    in_channels_homo = homdata.x.size(1)
+    num_nodes_homo = homdata.x.size(0)
+
+    # HetEvolveGCN
+    hev = RHEGCN(in_channels_homo, num_nodes_homo, list(hetdata.edge_index_dict.keys()))
+    hev.reset_parameters()
+    hevopt = torch.optim.Adam(params=hev.parameters(), lr=lr, weight_decay=weight_decay)
+
+    for i in range(num_snap - 1):
+        # CREATE TRAIN + VAL + TEST SET FOR THE CURRENT SNAP
+        snapshot = copy.deepcopy(snapshots[i])
+
+        link_split = RandomLinkSplit(num_val=0.0, num_test=0.20, edge_types=edge_types)
+
+        het_train_data, _, het_val_data = link_split(snapshot)
+
+        # het_test_data = copy.deepcopy(snapshots[i+1])
+        # future_link_split = RandomLinkSplit(num_val=0, num_test=0, edge_types = edge_types) #useful only for negative sampling
+        # het_test_data, _, _ = future_link_split(het_test_data)
+
+        # TRAIN AND TEST THE MODEL FOR THE CURRENT SNAP
+        hev, hevopt = het_train_single_snapshot_only_training(
+            hev, snapshot, het_train_data, het_val_data, hevopt
+        )
+
+        # SAVE AND DISPLAY EVALUATION
+        print(f"Snapshot: {i} completed\n")
+        gc.collect()
+
+    print("HetEvolveGCN Training Completed")
+
+    return hev, (), hevopt
+
+
+def training_complex(snapshots, dimension=2000, device="cpu"):
+    num_snap = len(snapshots)
+    hetdata = copy.deepcopy(snapshots[0])
+    edge_types = list(hetdata.edge_index_dict.keys())
+
+    lr = 0.001
+    weight_decay = 5e-3
+
+    in_channels = {node: len(v[0]) for node, v in hetdata.x_dict.items()}
+    num_nodes = {node: len(v) for node, v in hetdata.x_dict.items()}
+
+    homdata = copy.deepcopy(snapshots[0]).to_homogeneous()
+    in_channels_homo = homdata.x.size(1)
+    num_nodes_homo = homdata.x.size(0)
+
+    # ComplEx
+    cplex = ComplEx(dimension, num_nodes_homo, hetdata.metadata())
+    cplexopt = torch.optim.Adam(
+        params=cplex.parameters(), lr=lr, weight_decay=weight_decay
+    )
+
+    for i in range(num_snap - 1):
+        # CREATE TRAIN + VAL + TEST SET FOR THE CURRENT SNAP
+        snapshot = copy.deepcopy(snapshots[i])
+
+        link_split = RandomLinkSplit(num_val=0.0, num_test=0.20, edge_types=edge_types)
+
+        het_train_data, _, het_val_data = link_split(snapshot)
+
+        # het_test_data = copy.deepcopy(snapshots[i+1])
+        # future_link_split = RandomLinkSplit(num_val=0, num_test=0, edge_types = edge_types) #useful only for negative sampling
+        # het_test_data, _, _ = future_link_split(het_test_data)
+
+        # TRAIN AND TEST THE MODEL FOR THE CURRENT SNAP
+        cplex, cplexopt = het_train_single_snapshot_only_training(
+            cplex, snapshot, het_train_data, het_val_data, cplexopt
+        )
+
+        # SAVE AND DISPLAY EVALUATION
+        print(f"Snapshot: {i} completed\n")
+
+    print("ComplEx Training Completed")
+
+    return cplex, (), cplexopt
+
+
+def training_tntcomplex(snapshots, dimension, rnn_size=500, device="cpu"):
+    num_snap = len(snapshots)
+    hetdata = copy.deepcopy(snapshots[0])
+    edge_types = list(hetdata.edge_index_dict.keys())
+
+    lr = 0.001
+    weight_decay = 5e-3
+
+    in_channels = {node: len(v[0]) for node, v in hetdata.x_dict.items()}
+    num_nodes = {node: len(v) for node, v in hetdata.x_dict.items()}
+
+    homdata = copy.deepcopy(snapshots[0]).to_homogeneous()
+    in_channels_homo = homdata.x.size(1)
+    num_nodes_homo = homdata.x.size(0)
+
+    # TNTComplEx
+    tnt = TNTComplEx(2000, num_nodes_homo, hetdata.metadata(), len(snapshots), rnn_size)
+    tntopt = torch.optim.Adam(params=tnt.parameters(), lr=lr, weight_decay=weight_decay)
+
+    for i in range(num_snap - 1):
+        # CREATE TRAIN + VAL + TEST SET FOR THE CURRENT SNAP
+        snapshot = copy.deepcopy(snapshots[i])
+
+        link_split = RandomLinkSplit(num_val=0.0, num_test=0.20, edge_types=edge_types)
+
+        het_train_data, _, het_val_data = link_split(snapshot)
+
+        # het_test_data = copy.deepcopy(snapshots[i+1])
+        # future_link_split = RandomLinkSplit(num_val=0, num_test=0, edge_types = edge_types) #useful only for negative sampling
+        # het_test_data, _, _ = future_link_split(het_test_data)
+
+        # TRAIN AND TEST THE MODEL FOR THE CURRENT SNAP
+        tnt, tntopt = tnt_train_single_snapshot_only_training(
+            tnt, snapshot, i, het_train_data, het_val_data, tntopt
+        )
+
+        # SAVE AND DISPLAY EVALUATION
+        print(f"Snapshot: {i} completed\n")
+
+    print("TNTComplEx Training Completed")
+
+    return tnt, (), tntopt
 
 
 """
@@ -1736,7 +2879,9 @@ class RHAN(torch.nn.Module):
         self.conv2.reset_parameters()
         self.post.reset_parameters()
 
-    def forward(self, x_dict, edge_index_dict, data):
+    def forward(
+        self, x_dict, edge_index_dict, data, snap=0
+    ):  # snap is not used only for compatibility
         out_dict = self.conv1(x_dict, edge_index_dict)
         out_dict = {node: out.relu() for node, out in out_dict.items()}
         out_dict = self.conv2(out_dict, edge_index_dict)
@@ -1806,7 +2951,9 @@ class RHEGCN(torch.nn.Module):
     def reset_parameters(self):
         self.post.reset_parameters()
 
-    def forward(self, x_dict, edge_index_dict, data):
+    def forward(
+        self, x_dict, edge_index_dict, data, snap=0
+    ):  # snap is not used, only for compatibility
 
         out_dict = self.conv1(x_dict, edge_index_dict)
         out_dict = {node: out.relu() for node, out in out_dict.items()}
@@ -1878,7 +3025,9 @@ class ComplEx(torch.nn.Module):
 
         self.loss_fn = BCEWithLogitsLoss()
 
-    def forward(self, x_dict, edge_index_dict, data):
+    def forward(
+        self, x_dict, edge_index_dict, data, snap=0
+    ):  # snap is not used, only for compatibility
 
         out_dict = dict()
 
