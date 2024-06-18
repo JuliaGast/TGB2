@@ -27,7 +27,7 @@ from pathlib import Path
 
 
 def get_args():
-    parser = argparse.ArgumentParser("*** TGB: Durendal ***")
+    parser = argparse.ArgumentParser("*** Snapshot-based Models ***")
     parser.add_argument("--seed", type=int, help="Random seed", default=1)
     parser.add_argument(
         "--model_name",
