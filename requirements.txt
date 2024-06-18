@@ -63,3 +63,4 @@ chardet
 seasonal==0.3.1
 torchmetrics==0.11.0
 pybind11==2.11.1
+git+https://github.com/erfanloghmani/pytorch_geometric_temporal.git
