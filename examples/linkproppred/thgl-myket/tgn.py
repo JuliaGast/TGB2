@@ -2,7 +2,6 @@ import numpy as np
 from tgb.linkproppred.dataset_pyg import PyGLinkPropPredDataset
 from tgb.linkproppred.evaluate import Evaluator
 from torch_geometric.loader import TemporalDataLoader
-from tqdm import tqdm
 import timeit
 
 
@@ -15,12 +14,7 @@ from pathlib import Path
 import numpy as np
 
 import torch
-from sklearn.metrics import average_precision_score, roc_auc_score
-from torch.nn import Linear
-
-from torch_geometric.datasets import JODIEDataset
 from torch_geometric.loader import TemporalDataLoader
-from torch_geometric.nn import TransformerConv
 
 # internal imports
 from tgb.utils.utils import get_args, set_random_seed, save_results
@@ -31,7 +25,7 @@ from tgb_modules.msg_func import IdentityMessage
 from tgb_modules.msg_agg import LastAggregator
 from tgb_modules.neighbor_loader import LastNeighborLoader
 from tgb_modules.memory_module import TGNMemory
-from tgb_modules.early_stopping import  EarlyStopMonitor
+from tgb_modules.early_stopping import EarlyStopMonitor
 from tgb.linkproppred.dataset_pyg import PyGLinkPropPredDataset
 
 
@@ -48,7 +42,7 @@ def train():
         None
     Returns:
         None
-            
+
     """
 
     model['memory'].train()
@@ -63,7 +57,7 @@ def train():
         batch = batch.to(device)
         optimizer.zero_grad()
 
-        src, pos_dst, t, msg, rel = batch.src, batch.dst, batch.t, batch.msg, batch.edge_type
+        src, pos_dst, t, msg = batch.src, batch.dst, batch.t, batch.msg
 
         # Sample negative destination nodes.
         neg_dst = torch.randint(
@@ -134,13 +128,12 @@ def test(loader, neg_sampler, split_mode):
             pos_batch.edge_type
         )
 
-        neg_batch_list = neg_sampler.query_batch(pos_src, pos_dst, pos_t, pos_rel, split_mode=split_mode)
-
-        # pos_msg_new = torch.cat([pos_msg,pos_rel.unsqueeze(dim=1)], dim=1)   
-
+        neg_batch_list = neg_sampler.query_batch(
+            pos_src, pos_dst, pos_t, pos_rel, split_mode=split_mode)
 
         for idx, neg_batch in enumerate(neg_batch_list):
-            src = torch.full((1 + len(neg_batch),), pos_src[idx], device=device)
+            src = torch.full((1 + len(neg_batch),),
+                             pos_src[idx], device=device)
             dst = torch.tensor(
                 np.concatenate(
                     ([np.array([pos_dst.cpu().numpy()[idx]]), np.array(neg_batch)]),
@@ -199,9 +192,10 @@ args, _ = get_args()
 print("INFO: Arguments:", args)
 
 DATA = "thgl-myket"
+print("INFO: DATA:", DATA)
 LR = args.lr
 BATCH_SIZE = args.bs
-K_VALUE = args.k_value  
+K_VALUE = args.k_value
 NUM_EPOCH = args.num_epoch
 SEED = args.seed
 MEM_DIM = args.mem_dim
@@ -213,18 +207,20 @@ NUM_RUNS = args.num_run
 NUM_NEIGHBORS = 10
 USE_EDGE_TYPE = True
 USE_NODE_TYPE = True
-
-
+E_EMB_DIM = args.e_emb_dim  # 128
 
 MODEL_NAME = 'TGN'
+
+# ==========
+# ==========
 # ==========
 
 # set the device
-device = torch.device("cuda:2" if torch.cuda.is_available() else "cpu")
-print(device)
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 
 # data loading
+start_data_loading = timeit.default_timer()
 dataset = PyGLinkPropPredDataset(name=DATA, root="datasets")
 train_mask = dataset.train_mask
 val_mask = dataset.val_mask
@@ -233,17 +229,18 @@ data = dataset.get_TemporalData()
 data = data.to(device)
 metric = dataset.eval_metric
 
-print ("there are {} nodes and {} edges".format(dataset.num_nodes, dataset.num_edges))
-print ("there are {} relation types".format(dataset.num_rels))
+print("INFO: there are {} nodes and {} edges".format(
+    dataset.num_nodes, dataset.num_edges))
+print("INFO: there are {} relation types".format(dataset.num_rels))
 
 
 timestamp = data.t
 head = data.src
 tail = data.dst
-edge_type = data.edge_type #relation
+edge_type = data.edge_type  # relation
 edge_type_dim = len(torch.unique(edge_type))
 
-embed_edge_type = torch.nn.Embedding(edge_type_dim, 128).to(device)
+embed_edge_type = torch.nn.Embedding(edge_type_dim, E_EMB_DIM).to(device)
 with torch.no_grad():
     edge_type_embeddings = embed_edge_type(edge_type)
 
@@ -252,30 +249,31 @@ if USE_EDGE_TYPE:
     data.msg = torch.cat([data.msg, edge_type_embeddings], dim=1)
 
 #! node type is a property of the dataset not the temporal data as temporal data has one entry per edge
-node_type = dataset.node_type #node type
+node_type = dataset.node_type  # node type
 neg_sampler = dataset.negative_sampler
 
 data.__setattr__("node_type", node_type)
 
-print ("shape of edge type is", edge_type.shape)
-print ("shape of node type is", node_type.shape)
+print("INFO: edge type shape: ", edge_type.shape)
+print("INFO: node type shape: ", node_type.shape)
 
 train_data = data[train_mask]
 val_data = data[val_mask]
 test_data = data[test_mask]
-print ("finished loading PyG data")
+end_data_loading = timeit.default_timer()
+print(
+    f"INFO: Finished loading PyG data; Elapsed time: {end_data_loading - start_data_loading:.4f}")
 
 train_loader = TemporalDataLoader(train_data, batch_size=BATCH_SIZE)
 val_loader = TemporalDataLoader(val_data, batch_size=BATCH_SIZE)
 test_loader = TemporalDataLoader(test_data, batch_size=BATCH_SIZE)
 
-start_time = timeit.default_timer()
-
 # Ensure to only sample actual destination nodes as negatives.
 min_dst_idx, max_dst_idx = int(data.dst.min()), int(data.dst.max())
 
 # neighhorhood sampler
-neighbor_loader = LastNeighborLoader(data.num_nodes, size=NUM_NEIGHBORS, device=device)
+neighbor_loader = LastNeighborLoader(
+    data.num_nodes, size=NUM_NEIGHBORS, device=device)
 
 # define the model end-to-end
 memory = TGNMemory(
@@ -301,17 +299,20 @@ model = {'memory': memory,
          'link_pred': link_pred}
 
 optimizer = torch.optim.Adam(
-    set(model['memory'].parameters()) | set(model['gnn'].parameters()) | set(model['link_pred'].parameters()),
+    set(model['memory'].parameters()) | set(
+        model['gnn'].parameters()) | set(model['link_pred'].parameters()),
     lr=LR,
 )
-criterion = torch.nn.BCEWithLogitsLoss()
+# criterion = torch.nn.BCEWithLogitsLoss()
+criterion = torch.nn.BCELoss()  # because our predictor has a Sigmoid at the end!
 
 # Helper vector to map global node indices to local ones.
 assoc = torch.empty(data.num_nodes, dtype=torch.long, device=device)
 
 
 print("==========================================================")
-print(f"=================*** {MODEL_NAME}: LinkPropPred: {DATA} ***=============")
+print(
+    f"=================*** {MODEL_NAME}: LinkPropPred: {DATA} ***=============")
 print("==========================================================")
 
 evaluator = Evaluator(name=DATA)
@@ -337,29 +338,34 @@ for run_idx in range(NUM_RUNS):
     # define an early stopper
     save_model_dir = f'{osp.dirname(osp.abspath(__file__))}/saved_models/'
     save_model_id = f'{MODEL_NAME}_{DATA}_{SEED}_{run_idx}'
-    early_stopper = EarlyStopMonitor(save_model_dir=save_model_dir, save_model_id=save_model_id, 
-                                    tolerance=TOLERANCE, patience=PATIENCE)
+    early_stopper = EarlyStopMonitor(save_model_dir=save_model_dir, save_model_id=save_model_id,
+                                     tolerance=TOLERANCE, patience=PATIENCE)
 
     # ==================================================== Train & Validation
     # loading the validation negative samples
     dataset.load_val_ns()
 
-    val_perf_list = []
+    val_perf_list, val_time_list, train_time_list = [], [], []
     start_train_val = timeit.default_timer()
     for epoch in range(1, NUM_EPOCH + 1):
         # training
         start_epoch_train = timeit.default_timer()
+        start_train = timeit.default_timer()
         loss = train()
+        end_train = timeit.default_timer()
         print(
-            f"Epoch: {epoch:02d}, Loss: {loss:.4f}, Training elapsed Time (s): {timeit.default_timer() - start_epoch_train: .4f}"
+            f"Epoch: {epoch:02d}, Loss: {loss:.4f}, Training elapsed Time (s): {end_train - start_train: .4f}"
         )
+        train_time_list.append(end_train - start_train)
 
         # validation
         start_val = timeit.default_timer()
         perf_metric_val = test(val_loader, neg_sampler, split_mode="val")
+        end_val = timeit.default_timer()
         print(f"\tValidation {metric}: {perf_metric_val: .4f}")
-        print(f"\tValidation: Elapsed time (s): {timeit.default_timer() - start_val: .4f}")
+        print(f"\tValidation: Elapsed time (s): {end_val - start_val: .4f}")
         val_perf_list.append(perf_metric_val)
+        val_time_list.append(end_val - start_val)
 
         # check for early stopping
         if early_stopper.step_check(perf_metric_val, model):
@@ -388,25 +394,25 @@ for run_idx in range(NUM_RUNS):
                   'data': DATA,
                   'run': run_idx,
                   'seed': SEED,
-                  f'val {metric}': val_perf_list,
-                  f'test {metric}': perf_metric_test,
+                  'LR': LR,
+                  'E_EMB_DIM': E_EMB_DIM,
+                  'train times': train_time_list,
+                  'validation times': val_time_list,
+                  f'validation {metric}s': val_perf_list,
+                  'tot_train_val_time': train_val_time,
+                  'AVG train time': np.mean(np.array(train_time_list)),
+                  'AVG val time': np.mean(np.array(val_time_list)),
                   'test_time': test_time,
-                  'tot_train_val_time': train_val_time
-                  }, 
-    results_filename)
+                  'Total number of epochs': len(val_perf_list),
+                  f'Best val {metric}': np.max(np.array(val_perf_list)),
+                  f'test {metric}': perf_metric_test,
+                  },
+                 results_filename)
 
-    print(f"INFO: >>>>> Run: {run_idx}, elapsed time: {timeit.default_timer() - start_run: .4f} <<<<<")
+    print(
+        f"INFO: >>>>> Run: {run_idx}, elapsed time: {timeit.default_timer() - start_run: .4f} <<<<<")
     print('-------------------------------------------------------------------------------')
 
-print(f"Overall Elapsed Time (s): {timeit.default_timer() - start_overall: .4f}")
+print(
+    f"Overall Elapsed Time (s): {timeit.default_timer() - start_overall: .4f}")
 print("==============================================================")
-
-# #* load numpy arrays instead
-# from tgb.linkproppred.dataset import LinkPropPredDataset
-
-# # data loading
-# dataset = LinkPropPredDataset(name=DATA, root="datasets", preprocess=True)
-# data = dataset.full_data  
-# metric = dataset.eval_metric
-# sources = dataset.full_data['sources']
-# print ("finished loading numpy arrays")
