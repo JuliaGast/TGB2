@@ -29,6 +29,7 @@ from tgb.utils.pre_process import (
     csv_to_pd_data_sc,
     csv_to_pd_data_rc,
     load_edgelist_wiki,
+    load_edgelist_uci,
     csv_to_tkg_data,
     csv_to_thg_data,
     csv_to_forum_data,
@@ -304,6 +305,8 @@ class LinkPropPredDataset(object):
                 df, edge_feat, node_ids = load_edgelist_wiki(self.meta_dict["fname"])
             elif self.name == "tgbl-lastfm":
                 df, edge_feat, node_ids = load_edgelist_wiki(self.meta_dict["fname"])
+            elif self.name == "tgbl-uci":
+                df, edge_feat, node_ids = load_edgelist_uci(self.meta_dict["fname"])
             elif self.name == "tkgl-polecat":
                 df, edge_feat, node_ids = csv_to_tkg_data(self.meta_dict["fname"])
             elif self.name == "tkgl-icews":

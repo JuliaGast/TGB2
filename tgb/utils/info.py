@@ -26,6 +26,7 @@ DATA_URL_DICT = {
     "tgbl-wiki":"https://object-arbutus.cloud.computecanada.ca/tgb/tgbl-wiki-v2.zip", #"https://object-arbutus.cloud.computecanada.ca/tgb/tgbl-wiki.zip", #v1
     "tgbl-subreddit":"https://object-arbutus.cloud.computecanada.ca/tgb/tgbl-subreddit.zip",
     "tgbl-lastfm":"https://object-arbutus.cloud.computecanada.ca/tgb/tgbl-lastfm.zip",
+    "tgbl-uci":"https://object-arbutus.cloud.computecanada.ca/tgb/tgbl-uci.zip",
     "tgbl-review": "https://object-arbutus.cloud.computecanada.ca/tgb/tgbl-review-v2.zip", #"https://object-arbutus.cloud.computecanada.ca/tgb/tgbl-review.zip", #v1
     "tgbl-coin": "https://object-arbutus.cloud.computecanada.ca/tgb/tgbl-coin-v2.zip", #"https://object-arbutus.cloud.computecanada.ca/tgb/tgbl-coin.zip",
     "tgbl-flight": "https://object-arbutus.cloud.computecanada.ca/tgb/tgbl-flight-v2.zip", #"tgbl-flight": "https://object-arbutus.cloud.computecanada.ca/tgb/tgbl-flight_edgelist_v2_ts.zip",
@@ -51,6 +52,7 @@ DATA_VERSION_DICT = {
     "tgbl-wiki": 2,  
     "tgbl-subreddit": 1,
     "tgbl-lastfm": 1,
+    "tgbl-uci": 1,
     "tgbl-review": 2,
     "tgbl-coin": 2,
     "tgbl-comment": 1,
@@ -75,6 +77,7 @@ DATA_EVAL_METRIC_DICT = {
     "tgbl-wiki": "mrr",
     "tgbl-subreddit": "mrr",
     "tgbl-lastfm": "mrr",
+    "tgbl-uci": "mrr",
     "tgbl-review": "mrr",
     "tgbl-coin": "mrr",
     "tgbl-comment": "mrr",
@@ -98,6 +101,7 @@ DATA_NS_STRATEGY_DICT = {
     "tgbl-wiki": "hist_rnd",
     "tgbl-subreddit": "hist_rnd",
     "tgbl-lastfm": "hist_rnd",
+    "tgbl-uci": "hist_rnd",
     "tgbl-review": "hist_rnd",
     "tgbl-coin": "hist_rnd",
     "tgbl-comment": "hist_rnd",

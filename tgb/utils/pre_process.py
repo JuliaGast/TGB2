@@ -428,6 +428,33 @@ def load_edgelist_wiki(fname: str) -> pd.DataFrame:
 
 
 """
+functions for uci dataset
+---------------------------------------
+"""
+def load_edgelist_uci(fname: str) -> pd.DataFrame:
+    """
+    loading dataset into pandas dataframe
+
+    Parameters:
+        fname: str, name of the input file
+    Returns:
+        df: a pandas dataframe containing the edgelist data
+    """
+    df = pd.read_csv(fname, skiprows=1, header=None)
+    src = df.iloc[:, 0].values
+    dst = df.iloc[:, 1].values
+    t = df.iloc[:, 2].values
+    msg = np.ones(t.shape[0])
+    idx = np.arange(t.shape[0])
+    w = np.ones(t.shape[0])
+
+    return pd.DataFrame({"u": src, "i": dst, "ts": t, "idx": idx, "w": w}), msg, None
+
+
+
+
+
+"""
 functions for un_trade dataset
 ---------------------------------------
 """
