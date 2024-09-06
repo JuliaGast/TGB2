@@ -25,7 +25,7 @@ def write2csv(outname, out_dict):
         writer = csv.writer(f, delimiter =',')
         writer.writerow(['source','destination','timestamp'])
 
-        for u,v,t in out_dict.keys():
+        for t,u,v in out_dict.keys():
             row = [u, v, t]
             writer.writerow(row)
 
