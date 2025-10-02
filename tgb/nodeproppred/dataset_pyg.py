@@ -22,6 +22,7 @@ class PyGNodePropPredDataset(InMemoryDataset):
         root (string): Root directory where the dataset should be saved.
         transform (callable, optional): A function/transform that takes in an
         pre_transform (callable, optional): A function/transform that takes in
+        download (optional, bool): download dataset or not (default True)
     """
 
     def __init__(
@@ -30,10 +31,12 @@ class PyGNodePropPredDataset(InMemoryDataset):
         root: str,
         transform: Optional[Callable] = None,
         pre_transform: Optional[Callable] = None,
+        download: Optional[bool] = True,
+
     ):
         self.name = name
         self.root = root
-        self.dataset = NodePropPredDataset(name=name, root=root)
+        self.dataset = NodePropPredDataset(name=name, root=root, download=download)
         self._train_mask = torch.from_numpy(self.dataset.train_mask)
         self._val_mask = torch.from_numpy(self.dataset.val_mask)
         self._test_mask = torch.from_numpy(self.dataset.test_mask)

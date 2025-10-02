@@ -13,6 +13,7 @@ class PyGLinkPropPredDataset(Dataset):
         root: str,
         transform: Optional[Callable] = None,
         pre_transform: Optional[Callable] = None,
+        download: Optional[bool] = True,
     ):
         r"""
         PyG wrapper for the LinkPropPredDataset
@@ -23,10 +24,11 @@ class PyGLinkPropPredDataset(Dataset):
             root (string): Root directory where the dataset should be saved, passed to `LinkPropPredDataset`
             transform (callable, optional): A function/transform that takes in an, not used in this case
             pre_transform (callable, optional): A function/transform that takes in, not used in this case
+            download (optional, bool): download or not (default True)
         """
         self.name = name
         self.root = root
-        self.dataset = LinkPropPredDataset(name=name, root=root)
+        self.dataset = LinkPropPredDataset(name=name, root=root, download=download)
         self._train_mask = torch.from_numpy(self.dataset.train_mask)
         self._val_mask = torch.from_numpy(self.dataset.val_mask)
         self._test_mask = torch.from_numpy(self.dataset.test_mask)
