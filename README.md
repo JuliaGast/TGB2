@@ -57,10 +57,10 @@ For more details, see the release notes
 
 Includes all new datasets from TGB 2.0 including temporal knowledge graphs and temporal heterogeneous graphs. 
 
-
+<!-- 
 #### version `0.9.2`
 
-Update the fix for `tgbl-flight` where now the unix timestamps are provided directly in the dataset. If you had issues with `tgbl-flight`, please remove `TGB/tgb/datasets/tgbl_flight`and redownload the dataset for a clean install -->
+Update the fix for `tgbl-flight` where now the unix timestamps are provided directly in the dataset. If you had issues with `tgbl-flight`, please remove `TGB/tgb/datasets/tgbl_flight`and redownload the dataset for a clean install --> -->
 
 
 <!-- 
@@ -104,6 +104,11 @@ if website is unaccessible, please use [this link](https://tgb-website.pages.dev
 
 ### Acknowledgments
 We thank the [OGB](https://ogb.stanford.edu/) team for their support throughout this project and sharing their website code for the construction of [TGB website](https://tgb.complexdatalab.com/).
+
+
+### Software License
+
+The code from this repo is licensed under the MIT License (see LICENSE.txt)
 
 
 ### Citation
