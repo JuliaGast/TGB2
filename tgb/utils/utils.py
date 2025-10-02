@@ -12,6 +12,17 @@ import pandas as pd
 import torch
 
 
+_VERBOSE = os.getenv("VERBOSE", False)
+
+def set_verbose(flag: bool) -> None:
+    global _VERBOSE
+    _VERBOSE = flag
+
+def vprint(*args, **kwargs):
+    if _VERBOSE: print(*args, **kwargs)
+ 
+
+
 def add_inverse_quadruples(df: pd.DataFrame) -> pd.DataFrame:
     r"""
     adds the inverse relations required for the model to the dataframe

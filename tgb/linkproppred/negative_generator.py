@@ -5,21 +5,12 @@ Negative samples are generated and saved to files ONLY once;
 """
 
 import torch
-import random
-from torch import Tensor
 import numpy as np
 from torch_geometric.data import TemporalData
-from tgb.utils.utils import save_pkl, load_pkl
-from tgb.utils.info import PROJ_DIR
-import os.path as osp
+from tgb.utils.utils import save_pkl
 import os
-import time
 from tqdm import tqdm
-
-from torch_geometric.datasets import JODIEDataset
-from torch_geometric.loader import TemporalDataLoader
-
-from tgb.linkproppred.dataset_pyg import PyGLinkPropPredDataset
+from tgb.utils.utils import vprint
 
 
 class NegativeEdgeGenerator(object):
@@ -124,7 +115,7 @@ class NegativeEdgeGenerator(object):
             split_mode: specifies whether to generate negative edges for 'validation' or 'test' splits
             filename: name of the file containing the generated negative edges
         """
-        print(
+        vprint(
             f"INFO: Negative Sampling Strategy: {self.strategy}, Data Split: {split_mode}"
         )
         assert split_mode in [
@@ -133,11 +124,11 @@ class NegativeEdgeGenerator(object):
         ], "Invalid split-mode! It should be `val` or `test`!"
 
         if os.path.exists(filename):
-            print(
+            vprint(
                 f"INFO: negative samples for '{split_mode}' evaluation are already generated!"
             )
         else:
-            print(f"INFO: Generating negative samples for '{split_mode}' evaluation!")
+            vprint(f"INFO: Generating negative samples for '{split_mode}' evaluation!")
             # retrieve the information from the batch
             pos_src, pos_dst, pos_timestamp = (
                 data.src.cpu().numpy(),
@@ -236,7 +227,7 @@ class NegativeEdgeGenerator(object):
         Returns:
             None
         """
-        print(
+        vprint(
             f"INFO: Negative Sampling Strategy: {self.strategy}, Data Split: {split_mode}"
         )
         assert split_mode in [
@@ -245,11 +236,11 @@ class NegativeEdgeGenerator(object):
         ], "Invalid split-mode! It should be `val` or `test`!"
 
         if os.path.exists(filename):
-            print(
+            vprint(
                 f"INFO: negative samples for '{split_mode}' evaluation are already generated!"
             )
         else:
-            print(f"INFO: Generating negative samples for '{split_mode}' evaluation!")
+            vprint(f"INFO: Generating negative samples for '{split_mode}' evaluation!")
             # retrieve the information from the batch
             pos_src, pos_dst, pos_timestamp = (
                 data.src.cpu().numpy(),

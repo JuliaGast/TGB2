@@ -4,10 +4,8 @@ Evaluator Module for Dynamic Link Prediction
 
 import numpy as np
 from sklearn.metrics import *
-import math
 from tgb.utils.info import DATA_EVAL_METRIC_DICT
-
-
+from tgb.utils.utils import vprint
 
 try:
     import torch
@@ -65,7 +63,7 @@ class Evaluator(object):
                         "Arguments to Evaluator need to be either numpy ndarray or torch tensor!"
                     )
             else:
-                print(
+                vprint(
                     "ERROR: The evaluation metric should be in:", self.valid_metric_list
                 )
                 raise ValueError("Unsupported eval metric %s " % (eval_metric))
