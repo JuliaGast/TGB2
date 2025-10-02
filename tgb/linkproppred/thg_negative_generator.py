@@ -10,6 +10,8 @@ from tqdm import tqdm
 from torch_geometric.data import TemporalData
 from tgb.utils.utils import save_pkl
 from typing import Union
+from tgb.utils.utils import vprint
+
 
 
 """
@@ -144,7 +146,7 @@ class THGNegativeEdgeGenerator(object):
             split_mode: specifies whether to generate negative edges for 'validation' or 'test' splits
             filename: name of the file containing the generated negative edges
         """
-        print(
+        vprint(
             f"INFO: Negative Sampling Strategy: {self.strategy}, Data Split: {split_mode}"
         )
         assert split_mode in [
@@ -153,11 +155,11 @@ class THGNegativeEdgeGenerator(object):
         ], "Invalid split-mode! It should be `val` or `test`!"
 
         if os.path.exists(filename):
-            print(
+            vprint(
                 f"INFO: negative samples for '{split_mode}' evaluation are already generated!"
             )
         else:
-            print(f"INFO: Generating negative samples for '{split_mode}' evaluation!")
+            vprint(f"INFO: Generating negative samples for '{split_mode}' evaluation!")
             # retrieve the information from the batch
             pos_src, pos_dst, pos_timestamp, edge_type = (
                 data.src.cpu().numpy(),
@@ -203,7 +205,7 @@ class THGNegativeEdgeGenerator(object):
                             np.setdiff1d(all_dst, conflict_set), self.num_neg_e, replace=False)
                     filtered_all_dst = neg_d_arr
                 out_dict[key] = filtered_all_dst
-            print ("ns samples for ", len(out_dict), " positive edges are generated")
+            vprint ("ns samples for ", len(out_dict), " positive edges are generated")
             # save the generated evaluation set to disk
             save_pkl(out_dict, filename)
 
@@ -220,7 +222,7 @@ class THGNegativeEdgeGenerator(object):
             split_mode: specifies whether to generate negative edges for 'validation' or 'test' splits
             filename: name of the file containing the generated negative edges
         """
-        print(
+        vprint(
             f"INFO: Negative Sampling Strategy: {self.strategy}, Data Split: {split_mode}"
         )
         assert split_mode in [
@@ -229,11 +231,11 @@ class THGNegativeEdgeGenerator(object):
         ], "Invalid split-mode! It should be `val` or `test`!"
 
         if os.path.exists(filename):
-            print(
+            vprint(
                 f"INFO: negative samples for '{split_mode}' evaluation are already generated!"
             )
         else:
-            print(f"INFO: Generating negative samples for '{split_mode}' evaluation!")
+            vprint(f"INFO: Generating negative samples for '{split_mode}' evaluation!")
             # retrieve the information from the batch
             pos_src, pos_dst, pos_timestamp, edge_type = (
                 data.src.cpu().numpy(),

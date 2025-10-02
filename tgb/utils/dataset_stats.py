@@ -7,9 +7,7 @@ import pandas as pd
 import networkx as nx
 import argparse
 
-from torch_geometric.loader import TemporalDataLoader
 from tgb.nodeproppred.dataset_pyg import PyGNodePropPredDataset
-# from tgb.linkproppred.dataset_pyg import PyGLinkPropPredDataset
 from tgb.linkproppred.dataset import LinkPropPredDataset
 
 
@@ -35,9 +33,7 @@ def get_avg_e_per_ts(edgelist_df):
     for ts in unique_ts:
         num_e_at_this_ts = len(edgelist_df.loc[edgelist_df['ts'] == ts])
         sum_num_e_per_ts += num_e_at_this_ts
-    avg_num_e_per_ts = (sum_num_e_per_ts * 1.0) / len(unique_ts)
-    
-    # print(f"INFO: avg_num_e_per_ts: {avg_num_e_per_ts}")
+    avg_num_e_per_ts = (sum_num_e_per_ts * 1.0) / len(unique_ts)    
     return avg_num_e_per_ts
 
 
@@ -54,10 +50,7 @@ def get_avg_degree(edgelist_df):
             G.add_edge(e_row['src'], e_row['dst'], weight=e_row['ts'])
         nodes = G.nodes()
         degrees = [G.degree[n] for n in nodes]
-        degree_avg_at_ts_list.append(np.mean(degrees))
-
-    # print(f"INFO: avg_degree: {np.mean(degree_avg_at_ts_list)}")
-    
+        degree_avg_at_ts_list.append(np.mean(degrees))    
     return np.mean(degree_avg_at_ts_list)
 
 
@@ -228,7 +221,6 @@ def main():
                   'test': test_data,
                   'full': full_data,
                   }
-    # compute dataset statistics...
     print("=============================")
     print(f">>> DATA: {DATA}")
     dataset_stats = get_dataset_stats(split_data, temporal_stats)

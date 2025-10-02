@@ -12,14 +12,15 @@ import pandas as pd
 import torch
 
 
-_VERBOSE = os.getenv("VERBOSE", False)
+_VERBOSE = (os.getenv("TGB_VERBOSE", 'False') == 'True') #only allows TGB_VERBOSE=True to set _VERBOSE to true
 
 def set_verbose(flag: bool) -> None:
     global _VERBOSE
     _VERBOSE = flag
 
 def vprint(*args, **kwargs):
-    if _VERBOSE: print(*args, **kwargs)
+    global _VERBOSE
+    if (_VERBOSE): print(*args, **kwargs)
  
 
 

@@ -9,6 +9,7 @@ try:
     import torch
 except ImportError:
     torch = None
+from tgb.utils.utils import vprint
 
 
 class Evaluator(object):
@@ -65,7 +66,7 @@ class Evaluator(object):
                     raise RuntimeError("Shape of y_true and y_pred must be the same!")
 
             else:
-                print(
+                vprint(
                     "ERROR: The evaluation metric should be in:", self.valid_metric_list
                 )
                 raise ValueError("Undefined eval metric %s " % (eval_metric))
