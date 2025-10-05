@@ -1229,8 +1229,7 @@ def clean_rows(
 
             e = line.strip().split(",")
             if len(e) > 4:
-                vprint(e)
-                raise ValueError("line has more than 4 elements")
+                raise ValueError(f"line has more than 4 elements: {e}")
             outf.write(line)
 
     outf.close()
