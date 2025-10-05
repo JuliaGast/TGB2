@@ -49,7 +49,7 @@ Thanks to everyone for your help in improving TGB! we will continue to improve T
 
 **Please update to version `2.2.0`**
 
-#### version `2.1.0`
+#### version `2.2.0`
 Adding license for TGB software (for dataset license please check TGB website). 
 Printing messages now will not automatically set to stdout, use `TGB_VERBOSE=True` in your shell to set the print to be verbose.
 Default option is to automatically download the datasets (rather than command line input as before).  
