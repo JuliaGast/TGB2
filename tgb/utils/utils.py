@@ -12,7 +12,7 @@ import pandas as pd
 import torch
 
 
-_VERBOSE = (os.getenv("TGB_VERBOSE", 'False') == 'True') #only allows TGB_VERBOSE=True to set _VERBOSE to true
+_VERBOSE = os.getenv("TGB_VERBOSE", 'False').lower() in ['true', '1']
 
 def set_verbose(flag: bool) -> None:
     global _VERBOSE
