@@ -108,7 +108,7 @@ We thank the [OGB](https://ogb.stanford.edu/) team for their support throughout 
 
 ### Software License
 
-The code from this repo is licensed under the MIT License (see LICENSE.txt)
+The code from this repo is licensed under the MIT License (see LICENSE)
 
 
 ### Citation
