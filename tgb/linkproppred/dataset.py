@@ -198,7 +198,7 @@ class LinkPropPredDataset(object):
                 return None
         
 
-    def download(self,):
+    def download(self) -> None:
         """
         downloads this dataset from url
         check if files are already downloaded
