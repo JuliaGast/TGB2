@@ -3,7 +3,6 @@ import os
 import os.path as osp
 import numpy as np
 import pandas as pd
-import shutil
 import zipfile
 import requests
 from clint.textui import progress
@@ -16,7 +15,7 @@ from tgb.utils.info import (
     DATA_EVAL_METRIC_DICT,
     BColors,
 )
-from tgb.utils.utils import save_pkl, load_pkl
+from tgb.utils.utils import save_pkl, load_pkl, vprint
 from tgb.utils.pre_process import (
     load_label_dict,
     load_edgelist_sr,
@@ -31,9 +30,10 @@ class NodePropPredDataset(object):
     def __init__(
         self,
         name: str,
-        root: Optional[str] = "datasets",
+        root: str = "datasets",
         meta_dict: Optional[dict] = None,
         preprocess: Optional[bool] = True,
+        download: Optional[bool] = True, 
     ) -> None:
         r"""Dataset class for the node property prediction task. Stores meta information about each dataset such as evaluation metrics etc.
         also automatically pre-processes the dataset.
@@ -46,6 +46,7 @@ class NodePropPredDataset(object):
             root: root directory to store the dataset folder
             meta_dict: dictionary containing meta information about the dataset, should contain key 'dir_name' which is the name of the dataset folder
             preprocess: whether to pre-process the dataset
+            download: whether to download the dataset or not (default: True)
         Returns:
             None
         """
@@ -55,16 +56,13 @@ class NodePropPredDataset(object):
             self.url = DATA_URL_DICT[self.name]
         else:
             self.url = None
-            print(f"Dataset {self.name} url not found, download not supported yet.")
 
         # check if the evaluatioin metric are specified
         if self.name in DATA_EVAL_METRIC_DICT:
             self.metric = DATA_EVAL_METRIC_DICT[self.name]
         else:
             self.metric = None
-            print(
-                f"Dataset {self.name} default evaluation metric not found, it is not supported yet."
-            )
+            raise ValueError(f"Dataset {self.name} default evaluation metric not found, it is not supported yet.")
 
         root = PROJ_DIR + root
 
@@ -89,10 +87,20 @@ class NodePropPredDataset(object):
         self._node_feat = None
         self._edge_feat = None
         self._full_data = None
-        self.download()
+
+        if download:
+            self.download()
+        else:
+            if osp.exists(self.meta_dict["fname"]):
+                dir_name = self.meta_dict["fname"]
+                vprint(f"files found in {dir_name}")
+            else:
+                dir_name = self.meta_dict["fname"]
+                raise FileNotFoundError(f"Directory not found at {dir_name}, please download the dataset")
+            
         # check if the root directory exists, if not create it
         if osp.isdir(self.root):
-            print("Dataset directory is ", self.root)
+            vprint("Dataset directory is ", self.root)
         else:
             raise FileNotFoundError(f"Directory not found at {self.root}")
 
@@ -109,9 +117,7 @@ class NodePropPredDataset(object):
         if (self.name in DATA_VERSION_DICT):
             version = DATA_VERSION_DICT[self.name]
         else:
-            print(f"Dataset {self.name} version number not found.")
-            self.version_passed = False
-            return None
+            raise ValueError(f"Dataset {self.name} version number not found.")
         
         if (version > 1):
             #* check if current version is outdated
@@ -119,8 +125,7 @@ class NodePropPredDataset(object):
             self.meta_dict["nodefile"] = self.root + "/" + self.name + "_node_labels_v" + str(int(version)) + ".csv"
             
             if (not osp.exists(self.meta_dict["fname"])):
-                print(f"Dataset {self.name} version {int(version)} not found.")
-                print(f"Please download the latest version of the dataset.")
+                vprint(f"Dataset {self.name} version {int(version)} not found, Please download the latest version of the dataset.")
                 self.version_passed = False
                 return None
 
@@ -135,51 +140,40 @@ class NodePropPredDataset(object):
         if osp.exists(self.meta_dict["fname"]) and osp.exists(
             self.meta_dict["nodefile"]
         ):
-            print("raw file found, skipping download")
+            dir_name = self.meta_dict["fname"]
+            vprint(f"files found in {dir_name}")
             return
 
         else:
-            inp = input(
-                "Will you download the dataset(s) now? (y/N)\n"
-            ).lower()  # ask if the user wants to download the dataset
-            if inp == "y":
-                print(
-                    f"{BColors.WARNING}Download started, this might take a while . . . {BColors.ENDC}"
-                )
-                print(f"Dataset title: {self.name}")
+            vprint(
+                f"{BColors.WARNING}Download started, this might take a while . . . {BColors.ENDC}"
+            )
+            vprint(f"Dataset title: {self.name}")
 
-                if self.url is None:
-                    raise Exception(
-                        "Dataset url not found, download not supported yet."
-                    )
-                else:
-                    r = requests.get(self.url, stream=True)
-                    if osp.isdir(self.root):
-                        print("Dataset directory is ", self.root)
-                    else:
-                        os.makedirs(self.root)
-
-                    path_download = self.root + "/" + self.name + ".zip"
-                    with open(path_download, "wb") as f:
-                        total_length = int(r.headers.get("content-length"))
-                        for chunk in progress.bar(
-                            r.iter_content(chunk_size=1024),
-                            expected_size=(total_length / 1024) + 1,
-                        ):
-                            if chunk:
-                                f.write(chunk)
-                                f.flush()
-                    # for unzipping the file
-                    with zipfile.ZipFile(path_download, "r") as zip_ref:
-                        zip_ref.extractall(self.root)
-                    print(f"{BColors.OKGREEN}Download completed {BColors.ENDC}")
+            if self.url is None:
+                raise ValueError(f"Dataset {self.name} url not found, download not supported yet.")
             else:
-                raise Exception(
-                    BColors.FAIL
-                    + "Data not found error, download "
-                    + self.name
-                    + " failed"
-                )
+                r = requests.get(self.url, stream=True)
+                if osp.isdir(self.root):
+                    vprint("Dataset directory is ", self.root)
+                else:
+                    os.makedirs(self.root)
+
+                path_download = self.root + "/" + self.name + ".zip"
+                with open(path_download, "wb") as f:
+                    total_length = int(r.headers.get("content-length"))
+                    for chunk in progress.bar(
+                        r.iter_content(chunk_size=1024),
+                        expected_size=(total_length / 1024) + 1,
+                    ):
+                        if chunk:
+                            f.write(chunk)
+                            f.flush()
+                # for unzipping the file
+                with zipfile.ZipFile(path_download, "r") as zip_ref:
+                    zip_ref.extractall(self.root)
+                vprint(f"{BColors.OKGREEN}Download completed {BColors.ENDC}")
+          
 
     def generate_processed_files(
         self,
@@ -202,7 +196,7 @@ class NodePropPredDataset(object):
                 edge_feat = load_pkl(OUT_EDGE_FEAT)
                 if (self.name == "tgbn-token"):
                     #! taking log normalization for numerical stability
-                    print ("applying log normalization for weights in tgbn-token")
+                    vprint ("applying log normalization for weights in tgbn-token")
                     edge_feat[:,0] = np.log(edge_feat[:,0])
                 node_ids = load_pkl(OUT_NODE_DF)
                 labels_dict = load_pkl(OUT_LABEL_DF)
@@ -213,12 +207,12 @@ class NodePropPredDataset(object):
 
         # * load the preprocessed file if possible
         if osp.exists(OUT_DF) and osp.exists(OUT_NODE_DF) and osp.exists(OUT_EDGE_FEAT):
-            print("loading processed file")
+            vprint(f"loading processed file from {OUT_DF}, edge features from {OUT_EDGE_FEAT}, node info from {OUT_NODE_DF}.")
             df = pd.read_pickle(OUT_DF)
             node_label_dict = load_pkl(OUT_NODE_DF)
             edge_feat = load_pkl(OUT_EDGE_FEAT)
         else:  # * process the file
-            print("file not processed, generating processed file")
+            vprint("file not processed, generating processed file")
             if self.name == "tgbn-reddit":
                 df, edge_feat, node_ids, labels_dict = load_edgelist_sr(
                     self.meta_dict["fname"], label_size=self._num_classes
@@ -256,7 +250,7 @@ class NodePropPredDataset(object):
                 save_pkl(node_ids, OUT_NODE_DF)
                 save_pkl(labels_dict, OUT_LABEL_DF)
             
-            print("file processed and saved")
+            vprint("file processed and saved")
         return df, node_label_dict, edge_feat
 
     def pre_process(self) -> None:

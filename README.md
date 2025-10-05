@@ -47,7 +47,12 @@ TGX supports all TGB datasets and provides numerous temporal graph visualization
 
 Thanks to everyone for your help in improving TGB! we will continue to improve TGB based on your feedback and suggestions.  -->
 
-**Please update to version `2.1.0`**
+**Please update to version `2.2.0`**
+
+#### version `2.2.0`
+Adding license for TGB software (for dataset license please check TGB website). 
+Printing messages now will not automatically set to stdout, use `TGB_VERBOSE=True` in your shell to set the print to be verbose.
+Default option is to automatically download the datasets (rather than command line input as before).  
 
 #### version `2.1.0`
 Includes supplementary datasets `tgbl-lastfm` `tgbl-enron` `tgbl-uci` `tgbl-subreddit` for research purposes.
@@ -57,10 +62,10 @@ For more details, see the release notes
 
 Includes all new datasets from TGB 2.0 including temporal knowledge graphs and temporal heterogeneous graphs. 
 
-
+<!-- 
 #### version `0.9.2`
 
-Update the fix for `tgbl-flight` where now the unix timestamps are provided directly in the dataset. If you had issues with `tgbl-flight`, please remove `TGB/tgb/datasets/tgbl_flight`and redownload the dataset for a clean install -->
+Update the fix for `tgbl-flight` where now the unix timestamps are provided directly in the dataset. If you had issues with `tgbl-flight`, please remove `TGB/tgb/datasets/tgbl_flight`and redownload the dataset for a clean install --> -->
 
 
 <!-- 
@@ -104,6 +109,11 @@ if website is unaccessible, please use [this link](https://tgb-website.pages.dev
 
 ### Acknowledgments
 We thank the [OGB](https://ogb.stanford.edu/) team for their support throughout this project and sharing their website code for the construction of [TGB website](https://tgb.complexdatalab.com/).
+
+
+### Software License
+
+The code from this repo is licensed under the MIT License (see LICENSE)
 
 
 ### Citation

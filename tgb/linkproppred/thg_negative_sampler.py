@@ -6,12 +6,9 @@ Load already generated negative edges from file, batch them based on the positiv
 import torch
 from torch import Tensor
 import numpy as np
-from torch_geometric.data import TemporalData
-from tgb.utils.utils import save_pkl, load_pkl
-from tgb.utils.info import PROJ_DIR
+from tgb.utils.utils import load_pkl
 from typing import Union
 import os
-import time
 
 
 class THGNegativeEdgeSampler(object):

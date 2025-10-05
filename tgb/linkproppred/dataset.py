@@ -35,16 +35,18 @@ from tgb.utils.pre_process import (
     csv_to_staticdata,
 )
 from tgb.utils.utils import save_pkl, load_pkl
-from tgb.utils.utils import add_inverse_quadruples
+from tgb.utils.utils import add_inverse_quadruples, vprint
+
 
 
 class LinkPropPredDataset(object):
     def __init__(
         self,
         name: str,
-        root: Optional[str] = "datasets",
+        root: str = "datasets",
         meta_dict: Optional[dict] = None,
         preprocess: Optional[bool] = True,
+        download: Optional[bool] = True, 
     ):
         r"""Dataset class for link prediction dataset. Stores meta information about each dataset such as evaluation metrics etc.
         also automatically pre-processes the dataset.
@@ -53,6 +55,7 @@ class LinkPropPredDataset(object):
             root: root directory to store the dataset folder
             meta_dict: dictionary containing meta information about the dataset, should contain key 'dir_name' which is the name of the dataset folder
             preprocess: whether to pre-process the dataset
+            download: whether to download the dataset (default: true)
         """
         self.name = name  ## original name
         # check if dataset url exist
@@ -60,7 +63,6 @@ class LinkPropPredDataset(object):
             self.url = DATA_URL_DICT[self.name]
         else:
             self.url = None
-            print(f"Dataset {self.name} url not found, download not supported yet.")
 
         
         # check if the evaluatioin metric are specified
@@ -68,11 +70,8 @@ class LinkPropPredDataset(object):
             self.metric = DATA_EVAL_METRIC_DICT[self.name]
         else:
             self.metric = None
-            print(
-                f"Dataset {self.name} default evaluation metric not found, it is not supported yet."
-            )
-
-
+            raise ValueError(f"Dataset {self.name} default evaluation metric not found, it is not supported yet.")
+        
         root = PROJ_DIR + root
 
         if meta_dict is None:
@@ -122,12 +121,21 @@ class LinkPropPredDataset(object):
         self._node_type = None
         self._node_id = None
 
-        self.download()
+        if download:
+            self.download()
+        else:
+            if osp.exists(self.meta_dict["fname"]):
+                dir_name = self.meta_dict["fname"]
+                vprint(f"files found in {dir_name}")
+            else:
+                dir_name = self.meta_dict["fname"]
+                raise FileNotFoundError(f"Directory not found at {dir_name}, please download the dataset")
+            
+        
         # check if the root directory exists, if not create it
         if osp.isdir(self.root):
-            print("Dataset directory is ", self.root)
+            vprint("Dataset directory is ", self.root)
         else:
-            # os.makedirs(self.root)
             raise FileNotFoundError(f"Directory not found at {self.root}")
 
         if preprocess:
@@ -173,9 +181,7 @@ class LinkPropPredDataset(object):
         if (self.name in DATA_VERSION_DICT):
             version = DATA_VERSION_DICT[self.name]
         else:
-            print(f"Dataset {self.name} version number not found.")
-            self.version_passed = False
-            return None
+            raise ValueError(f"Dataset {self.name} version number not found.")
         
         if (version > 1):
             #* check if current version is outdated
@@ -187,61 +193,53 @@ class LinkPropPredDataset(object):
             self.meta_dict["test_ns"] = self.root + "/" + self.name + "_test_ns_v" + str(int(version)) + ".pkl"
             
             if (not osp.exists(self.meta_dict["fname"])):
-                print(f"Dataset {self.name} version {int(version)} not found.")
-                print(f"Please download the latest version of the dataset.")
+                vprint(f"Dataset {self.name} version {int(version)} not found, Please download the latest version of the dataset.")
                 self.version_passed = False
                 return None
         
 
-    def download(self):
+    def download(self) -> None:
         """
         downloads this dataset from url
         check if files are already downloaded
         """
         # check if the file already exists
         if osp.exists(self.meta_dict["fname"]):
-            print("raw file found, skipping download")
-            return
+            dir_name = self.meta_dict["fname"]
+            vprint(f"files found in {dir_name}")
+            return None
 
-        inp = input(
-            "Will you download the dataset(s) now? (y/N)\n"
-        ).lower()  # ask if the user wants to download the dataset
+        vprint(
+            f"{BColors.WARNING}Download started, this might take a while . . . {BColors.ENDC}"
+        )
+        vprint(f"Dataset title: {self.name}")
 
-        if inp == "y":
-            print(
-                f"{BColors.WARNING}Download started, this might take a while . . . {BColors.ENDC}"
-            )
-            print(f"Dataset title: {self.name}")
-
-            if self.url is None:
-                raise Exception("Dataset url not found, download not supported yet.")
-            else:
-                r = requests.get(self.url, stream=True)
-                # download_dir = self.root + "/" + "download"
-                if osp.isdir(self.root):
-                    print("Dataset directory is ", self.root)
-                else:
-                    os.makedirs(self.root)
-
-                path_download = self.root + "/" + self.name + ".zip"
-                with open(path_download, "wb") as f:
-                    total_length = int(r.headers.get("content-length"))
-                    for chunk in progress.bar(
-                        r.iter_content(chunk_size=1024),
-                        expected_size=(total_length / 1024) + 1,
-                    ):
-                        if chunk:
-                            f.write(chunk)
-                            f.flush()
-                # for unzipping the file
-                with zipfile.ZipFile(path_download, "r") as zip_ref:
-                    zip_ref.extractall(self.root)
-                print(f"{BColors.OKGREEN}Download completed {BColors.ENDC}")
-                self.version_passed = True
+        if self.url is None:
+            raise ValueError(f"Dataset {self.name} url not found, download not supported yet.")
         else:
-            raise Exception(
-                BColors.FAIL + "Data not found error, download " + self.name + " failed"
-            )
+            r = requests.get(self.url, stream=True)
+            # download_dir = self.root + "/" + "download"
+            if osp.isdir(self.root):
+                vprint("Dataset directory is ", self.root)
+            else:
+                os.makedirs(self.root)
+
+            path_download = self.root + "/" + self.name + ".zip"
+            with open(path_download, "wb") as f:
+                total_length = int(r.headers.get("content-length"))
+                for chunk in progress.bar(
+                    r.iter_content(chunk_size=1024),
+                    expected_size=(total_length / 1024) + 1,
+                ):
+                    if chunk:
+                        f.write(chunk)
+                        f.flush()
+            # for unzipping the file
+            with zipfile.ZipFile(path_download, "r") as zip_ref:
+                zip_ref.extractall(self.root)
+            vprint(f"{BColors.OKGREEN}Download completed {BColors.ENDC}")
+            self.version_passed = True
+      
 
     def generate_processed_files(self) -> pd.DataFrame:
         r"""
@@ -274,8 +272,8 @@ class LinkPropPredDataset(object):
         if self.meta_dict["nodeTypeFile"] is not None:
             OUT_NODE_TYPE = self.root + "/" + "ml_{}.pkl".format(self.name + "_nodeType")
 
-        if (osp.exists(OUT_DF)) and (self.version_passed is True):
-            print("loading processed file")
+        if osp.exists(OUT_DF) and self.version_passed is True:
+            vprint(f"loading processed file from {OUT_DF}.")
             df = pd.read_pickle(OUT_DF)
             edge_feat = load_pkl(OUT_EDGE_FEAT)
             if (self.name == "tkgl-wikidata") or (self.name == "tkgl-smallpedia"):
@@ -288,7 +286,7 @@ class LinkPropPredDataset(object):
                 self._node_type = node_type
 
         else:
-            print("file not processed, generating processed file")
+            vprint("file not processed, generating processed file")
             if self.name == "tgbl-flight":
                 df, edge_feat, node_ids = csv_to_pd_data(self.meta_dict["fname"])
             elif self.name == "tgbl-coin":
@@ -435,17 +433,17 @@ class LinkPropPredDataset(object):
         """
         if ("staticfile" in self.meta_dict):
             OUT_DF = self.root + "/" + "ml_{}.pkl".format(self.name + "_static")
-            if (osp.exists(OUT_DF)) and (self.version_passed is True):
-                print("loading processed file")
+            if osp.exists(OUT_DF) and self.version_passed is True:
+                vprint(f"loading processed file from {OUT_DF}.")
                 static_dict = load_pkl(OUT_DF)
                 self._static_data = static_dict
             else:
-                print("file not processed, generating processed file")
+                vprint("file not processed, generating processed file")
                 static_dict, node_ids =  csv_to_staticdata(self.meta_dict["staticfile"], self._node_id)
                 save_pkl(static_dict, OUT_DF)
                 self._static_data = static_dict
         else:
-            print ("static edges are only for tkgl-wikidata and tkgl-smallpedia datasets")
+            vprint ("static edges are only for tkgl-wikidata and tkgl-smallpedia datasets")
 
     
     @property

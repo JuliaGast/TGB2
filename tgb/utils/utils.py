@@ -12,6 +12,18 @@ import pandas as pd
 import torch
 
 
+_VERBOSE = os.getenv("TGB_VERBOSE", 'False').lower() in ['true', '1']
+
+def set_verbose(flag: bool) -> None:
+    global _VERBOSE
+    _VERBOSE = flag
+
+def vprint(*args, **kwargs):
+    global _VERBOSE
+    if _VERBOSE: print(*args, **kwargs)
+ 
+
+
 def add_inverse_quadruples(df: pd.DataFrame) -> pd.DataFrame:
     r"""
     adds the inverse relations required for the model to the dataframe
@@ -115,7 +127,7 @@ def set_random_seed(random_seed: int):
     torch.cuda.manual_seed_all(random_seed)
     torch.backends.cudnn.benchmark = False
     torch.backends.cudnn.deterministic = True
-    print(f'INFO: fixed random seed: {random_seed}')
+    vprint(f'INFO: fixed random seed: {random_seed}')
 
 
 
