@@ -24,7 +24,6 @@ from modules.edgebank_predictor import EdgeBankPredictor
 from tgb.utils.utils import set_random_seed
 from tgb.linkproppred.dataset import LinkPropPredDataset
 from tgb.utils.utils import save_results
-from tgb.utils.utils import vprint
 
 # ==================
 # ==================

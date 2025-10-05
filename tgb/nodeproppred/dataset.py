@@ -88,7 +88,7 @@ class NodePropPredDataset(object):
         self._edge_feat = None
         self._full_data = None
 
-        if (download):
+        if download:
             self.download()
         else:
             if osp.exists(self.meta_dict["fname"]):
@@ -117,9 +117,7 @@ class NodePropPredDataset(object):
         if (self.name in DATA_VERSION_DICT):
             version = DATA_VERSION_DICT[self.name]
         else:
-            vprint(f"Dataset {self.name} version number not found.")
-            self.version_passed = False
-            return None
+            raise ValueError(f"Dataset {self.name} version number not found.")
         
         if (version > 1):
             #* check if current version is outdated
@@ -127,8 +125,7 @@ class NodePropPredDataset(object):
             self.meta_dict["nodefile"] = self.root + "/" + self.name + "_node_labels_v" + str(int(version)) + ".csv"
             
             if (not osp.exists(self.meta_dict["fname"])):
-                vprint(f"Dataset {self.name} version {int(version)} not found.")
-                vprint(f"Please download the latest version of the dataset.")
+                vprint(f"Dataset {self.name} version {int(version)} not found, Please download the latest version of the dataset.")
                 self.version_passed = False
                 return None
 
@@ -154,9 +151,7 @@ class NodePropPredDataset(object):
             vprint(f"Dataset title: {self.name}")
 
             if self.url is None:
-                raise Exception(
-                    "Dataset url not found, download not supported yet."
-                )
+                raise ValueError(f"Dataset {self.name} url not found, download not supported yet.")
             else:
                 r = requests.get(self.url, stream=True)
                 if osp.isdir(self.root):
@@ -212,7 +207,7 @@ class NodePropPredDataset(object):
 
         # * load the preprocessed file if possible
         if osp.exists(OUT_DF) and osp.exists(OUT_NODE_DF) and osp.exists(OUT_EDGE_FEAT):
-            vprint("loading processed file")
+            vprint(f"loading processed file from {OUT_DF}, edge features from {OUT_EDGE_FEAT}, node info from {OUT_NODE_DF}.")
             df = pd.read_pickle(OUT_DF)
             node_label_dict = load_pkl(OUT_NODE_DF)
             edge_feat = load_pkl(OUT_EDGE_FEAT)

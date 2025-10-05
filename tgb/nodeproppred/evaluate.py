@@ -66,10 +66,8 @@ class Evaluator(object):
                     raise RuntimeError("Shape of y_true and y_pred must be the same!")
 
             else:
-                vprint(
-                    "ERROR: The evaluation metric should be in:", self.valid_metric_list
-                )
-                raise ValueError("Undefined eval metric %s " % (eval_metric))
+                raise ValueError(f"Unsupported eval metric: {eval_metric}, not found in {self.valid_metric_list}")
+
         self.eval_metric = input_dict["eval_metric"]
 
         return y_true, y_pred

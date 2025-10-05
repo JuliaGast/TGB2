@@ -121,7 +121,7 @@ class LinkPropPredDataset(object):
         self._node_type = None
         self._node_id = None
 
-        if (download):
+        if download:
             self.download()
         else:
             if osp.exists(self.meta_dict["fname"]):
@@ -181,9 +181,7 @@ class LinkPropPredDataset(object):
         if (self.name in DATA_VERSION_DICT):
             version = DATA_VERSION_DICT[self.name]
         else:
-            vprint(f"Dataset {self.name} version number not found.")
-            self.version_passed = False
-            return None
+            raise ValueError(f"Dataset {self.name} version number not found.")
         
         if (version > 1):
             #* check if current version is outdated
@@ -195,8 +193,7 @@ class LinkPropPredDataset(object):
             self.meta_dict["test_ns"] = self.root + "/" + self.name + "_test_ns_v" + str(int(version)) + ".pkl"
             
             if (not osp.exists(self.meta_dict["fname"])):
-                vprint(f"Dataset {self.name} version {int(version)} not found.")
-                vprint(f"Please download the latest version of the dataset.")
+                vprint(f"Dataset {self.name} version {int(version)} not found, Please download the latest version of the dataset.")
                 self.version_passed = False
                 return None
         
@@ -218,7 +215,7 @@ class LinkPropPredDataset(object):
         vprint(f"Dataset title: {self.name}")
 
         if self.url is None:
-            raise Exception(f"Dataset {self.name} url not found, download not supported yet.")
+            raise ValueError(f"Dataset {self.name} url not found, download not supported yet.")
         else:
             r = requests.get(self.url, stream=True)
             # download_dir = self.root + "/" + "download"
@@ -275,8 +272,8 @@ class LinkPropPredDataset(object):
         if self.meta_dict["nodeTypeFile"] is not None:
             OUT_NODE_TYPE = self.root + "/" + "ml_{}.pkl".format(self.name + "_nodeType")
 
-        if (osp.exists(OUT_DF)) and (self.version_passed is True):
-            vprint("loading processed file")
+        if osp.exists(OUT_DF) and self.version_passed is True:
+            vprint(f"loading processed file from {OUT_DF}.")
             df = pd.read_pickle(OUT_DF)
             edge_feat = load_pkl(OUT_EDGE_FEAT)
             if (self.name == "tkgl-wikidata") or (self.name == "tkgl-smallpedia"):
@@ -436,8 +433,8 @@ class LinkPropPredDataset(object):
         """
         if ("staticfile" in self.meta_dict):
             OUT_DF = self.root + "/" + "ml_{}.pkl".format(self.name + "_static")
-            if (osp.exists(OUT_DF)) and (self.version_passed is True):
-                vprint("loading processed file")
+            if osp.exists(OUT_DF) and self.version_passed is True:
+                vprint(f"loading processed file from {OUT_DF}.")
                 static_dict = load_pkl(OUT_DF)
                 self._static_data = static_dict
             else:

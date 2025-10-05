@@ -58,7 +58,7 @@ def csv_to_forum_data(
     """
     feat_size = 2
     num_lines = sum(1 for line in open(fname)) - 1
-    vprint("number of lines counted", num_lines)
+    vprint(f"number of lines counted: {num_lines} in {fname}")
     u_list = np.zeros(num_lines)
     i_list = np.zeros(num_lines)
     ts_list = np.zeros(num_lines)
@@ -139,7 +139,7 @@ def csv_to_thg_data(
     """
     feat_size = 1
     num_lines = sum(1 for line in open(fname)) - 1
-    vprint("number of lines counted", num_lines)
+    vprint(f"number of lines counted: {num_lines} in {fname}")
     u_list = np.zeros(num_lines)
     i_list = np.zeros(num_lines)
     ts_list = np.zeros(num_lines)
@@ -210,7 +210,7 @@ def csv_to_wikidata(
     """
     feat_size = 1
     num_lines = sum(1 for line in open(fname)) - 1
-    vprint("number of lines counted", num_lines)
+    vprint(f"number of lines counted: {num_lines} in {fname}")
     u_list = np.zeros(num_lines)
     i_list = np.zeros(num_lines)
     ts_list = np.zeros(num_lines)
@@ -285,7 +285,7 @@ def csv_to_staticdata(
         node_ids: dictionary of node names mapped to integer node ids
     """
     num_lines = sum(1 for line in open(fname)) - 1
-    vprint("number of lines counted", num_lines)
+    vprint(f"number of lines counted: {num_lines} in {fname}")
     u_list = np.zeros(num_lines)
     i_list = np.zeros(num_lines)
     edge_type = np.zeros(num_lines)
@@ -342,7 +342,7 @@ def csv_to_tkg_data(
     """
     feat_size = 1
     num_lines = sum(1 for line in open(fname)) - 1
-    vprint("number of lines counted", num_lines)
+    vprint(f"number of lines counted: {num_lines} in {fname}")
     u_list = np.zeros(num_lines)
     i_list = np.zeros(num_lines)
     ts_list = np.zeros(num_lines)
@@ -440,7 +440,7 @@ def load_edgelist_trade(fname: str, label_size=255):
     """
     feat_size = 1
     num_lines = sum(1 for line in open(fname)) - 1
-    vprint("number of lines counted", num_lines)
+
     u_list = np.zeros(num_lines)
     i_list = np.zeros(num_lines)
     ts_list = np.zeros(num_lines)
@@ -909,7 +909,7 @@ def csv_to_pd_data_sc(
     """
     feat_size = 1
     num_lines = sum(1 for line in open(fname)) - 1
-    vprint("number of lines counted", num_lines)
+    vprint(f"number of lines counted: {num_lines} in {fname}")
     u_list = np.zeros(num_lines)
     i_list = np.zeros(num_lines)
     ts_list = np.zeros(num_lines)
@@ -1015,7 +1015,7 @@ def csv_to_pd_data(
     """
     feat_size = 16
     num_lines = sum(1 for line in open(fname)) - 1
-    vprint("number of lines counted", num_lines)
+    vprint(f"number of lines counted: {num_lines} in {fname}")
     u_list = np.zeros(num_lines)
     i_list = np.zeros(num_lines)
     ts_list = np.zeros(num_lines)
@@ -1023,7 +1023,6 @@ def csv_to_pd_data(
     feat_l = np.zeros((num_lines, feat_size))
     idx_list = np.zeros(num_lines)
     w_list = np.zeros(num_lines)
-    vprint("numpy allocated")
     node_ids = {}
     unique_id = 0
     ts_format = None
@@ -1254,7 +1253,7 @@ def load_edgelist_datetime(fname, label_size=514):
     """
     feat_size = 1
     num_lines = sum(1 for line in open(fname)) - 1
-    vprint("number of lines counted", num_lines)
+    vprint(f"number of lines counted: {num_lines} in {fname}")
     u_list = np.zeros(num_lines)
     i_list = np.zeros(num_lines)
     ts_list = np.zeros(num_lines)

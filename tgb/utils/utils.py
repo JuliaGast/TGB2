@@ -20,7 +20,7 @@ def set_verbose(flag: bool) -> None:
 
 def vprint(*args, **kwargs):
     global _VERBOSE
-    if (_VERBOSE): print(*args, **kwargs)
+    if _VERBOSE: print(*args, **kwargs)
  
 
 
