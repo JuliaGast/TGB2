@@ -127,7 +127,7 @@ def set_random_seed(random_seed: int):
     torch.cuda.manual_seed_all(random_seed)
     torch.backends.cudnn.benchmark = False
     torch.backends.cudnn.deterministic = True
-    print(f'INFO: fixed random seed: {random_seed}')
+    vprint(f'INFO: fixed random seed: {random_seed}')
 
 
 

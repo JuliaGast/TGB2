@@ -9,6 +9,7 @@ import argparse
 
 from tgb.nodeproppred.dataset_pyg import PyGNodePropPredDataset
 from tgb.linkproppred.dataset import LinkPropPredDataset
+from tgb.utils.utils import vprint
 
 
 
@@ -221,12 +222,12 @@ def main():
                   'test': test_data,
                   'full': full_data,
                   }
-    print("=============================")
-    print(f">>> DATA: {DATA}")
+    vprint("=============================")
+    vprint(f">>> DATA: {DATA}")
     dataset_stats = get_dataset_stats(split_data, temporal_stats)
     for k, v in dataset_stats.items():
-        print(f"{k}: {v}")
-    print("=============================")
+        vprint(f"{k}: {v}")
+    vprint("=============================")
 
 
 if __name__ == "__main__":

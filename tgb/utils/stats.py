@@ -3,7 +3,7 @@ script for generating statistics from the dataset
 """
 import csv
 import numpy as np
-# import matplotlib.pyplot as plt
+from tgb.utils.utils import vprint
 
 
 """
@@ -54,11 +54,11 @@ def analyze_csv(fname):
                 else:
                     edge_dict[(u, v)] += 1
 
-    print("----------------------high level statistics-------------------------")
-    print("number of total edges are ", num_edges)
-    print("number of nodes are ", len(node_dict))
-    print("number of unique edges are ", len(edge_dict))
-    print("number of unique timestamps are ", num_time)
+    vprint("----------------------high level statistics-------------------------")
+    vprint("number of total edges are ", num_edges)
+    vprint("number of nodes are ", len(node_dict))
+    vprint("number of unique edges are ", len(edge_dict))
+    vprint("number of unique timestamps are ", num_time)
 
     num_10 = 0
     num_100 = 0
@@ -71,10 +71,10 @@ def analyze_csv(fname):
             num_100 += 1
         if node_dict[node] >= 1000:
             num_1000 += 1
-    print("number of nodes with # edges >= 10 is ", num_10)
-    print("number of nodes with # edges >= 100 is ", num_100)
-    print("number of nodes with # edges >= 1000 is ", num_1000)
-    print("----------------------high level statistics-------------------------")
+    vprint("number of nodes with # edges >= 10 is ", num_10)
+    vprint("number of nodes with # edges >= 100 is ", num_100)
+    vprint("number of nodes with # edges >= 1000 is ", num_1000)
+    vprint("----------------------high level statistics-------------------------")
 
 
 def plot_curve(y: np.ndarray, outname: str) -> None:

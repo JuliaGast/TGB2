@@ -9,6 +9,8 @@ import matplotlib.pyplot as plt
 from tgb.utils.utils import save_pkl
 import os
 from tqdm import tqdm
+from tgb.utils.utils import vprint
+
 
 
 """
@@ -118,7 +120,7 @@ class TKGNegativeEdgeGenerator(object):
             dst = np.array(list(dst_track_dict[key].keys()))
             edge_type_size.append(len(dst))
             dst_dict[key] = dst
-        print ('destination candidates generated for all edge types ', len(dst_dict))
+        vprint ('destination candidates generated for all edge types ', len(dst_dict))
         return dst_dict
 
     def generate_negative_samples(self, 
@@ -171,7 +173,7 @@ class TKGNegativeEdgeGenerator(object):
             split_mode: specifies whether to generate negative edges for 'validation' or 'test' splits
             filename: name of the file containing the generated negative edges
         """
-        print(
+        vprint(
             f"INFO: Negative Sampling Strategy: {self.strategy}, Data Split: {split_mode}"
         )
         assert split_mode in [
@@ -180,11 +182,11 @@ class TKGNegativeEdgeGenerator(object):
         ], "Invalid split-mode! It should be `val` or `test`!"
 
         if os.path.exists(filename):
-            print(
+            vprint(
                 f"INFO: negative samples for '{split_mode}' evaluation are already generated!"
             )
         else:
-            print(f"INFO: Generating negative samples for '{split_mode}' evaluation!")
+            vprint(f"INFO: Generating negative samples for '{split_mode}' evaluation!")
             # retrieve the information from the batch
             pos_src, pos_dst, pos_timestamp, edge_type = (
                 data.src.cpu().numpy(),
@@ -214,7 +216,7 @@ class TKGNegativeEdgeGenerator(object):
             for key in edge_t_dict:
                 conflict_dict[key] = np.array(list(edge_t_dict[key].keys()))
             
-            print ("conflict sets for ns samples for ", len(conflict_dict), " positive edges are generated")
+            vprint ("conflict sets for ns samples for ", len(conflict_dict), " positive edges are generated")
             # save the generated evaluation set to disk
             save_pkl(conflict_dict, filename)
 
@@ -235,7 +237,7 @@ class TKGNegativeEdgeGenerator(object):
             split_mode: specifies whether to generate negative edges for 'validation' or 'test' splits
             filename: name of the file containing the generated negative edges
         """
-        print(
+        vprint(
             f"INFO: Negative Sampling Strategy: {self.strategy}, Data Split: {split_mode}"
         )
         assert split_mode in [
@@ -244,14 +246,14 @@ class TKGNegativeEdgeGenerator(object):
         ], "Invalid split-mode! It should be `val` or `test`!"
 
         if os.path.exists(filename):
-            print(
+            vprint(
                 f"INFO: negative samples for '{split_mode}' evaluation are already generated!"
             )
         else:
             if self.dst_dict is None:
                 raise ValueError("The dst_dict is not generated!")
 
-            print(f"INFO: Generating negative samples for '{split_mode}' evaluation!")
+            vprint(f"INFO: Generating negative samples for '{split_mode}' evaluation!")
             # retrieve the information from the batch
             pos_src, pos_dst, pos_timestamp, edge_type = (
                 data.src.cpu().numpy(),
@@ -318,7 +320,7 @@ class TKGNegativeEdgeGenerator(object):
 
                 out_dict[(pos_t, pos_s, edge_type)] = dst_sampled
             
-            print ("negative samples for ", len(out_dict), " positive edges are generated")
+            vprint ("negative samples for ", len(out_dict), " positive edges are generated")
             # save the generated evaluation set to disk
             save_pkl(out_dict, filename)
 
@@ -336,7 +338,7 @@ class TKGNegativeEdgeGenerator(object):
             split_mode: specifies whether to generate negative edges for 'validation' or 'test' splits
             filename: name of the file containing the generated negative edges
         """
-        print(
+        vprint(
             f"INFO: Negative Sampling Strategy: {self.strategy}, Data Split: {split_mode}"
         )
         assert split_mode in [
@@ -345,11 +347,11 @@ class TKGNegativeEdgeGenerator(object):
         ], "Invalid split-mode! It should be `val` or `test`!"
 
         if os.path.exists(filename):
-            print(
+            vprint(
                 f"INFO: negative samples for '{split_mode}' evaluation are already generated!"
             )
         else:
-            print(f"INFO: Generating negative samples for '{split_mode}' evaluation!")
+            vprint(f"INFO: Generating negative samples for '{split_mode}' evaluation!")
             # retrieve the information from the batch
             pos_src, pos_dst, pos_timestamp, edge_type = (
                 data.src.cpu().numpy(),
