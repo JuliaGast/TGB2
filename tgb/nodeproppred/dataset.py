@@ -30,7 +30,7 @@ class NodePropPredDataset(object):
     def __init__(
         self,
         name: str,
-        root: Optional[str] = "datasets",
+        root: str = "datasets",
         meta_dict: Optional[dict] = None,
         preprocess: Optional[bool] = True,
         download: Optional[bool] = True, 

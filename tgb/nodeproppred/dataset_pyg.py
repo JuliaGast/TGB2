@@ -28,7 +28,7 @@ class PyGNodePropPredDataset(InMemoryDataset):
     def __init__(
         self,
         name: str,
-        root: Optional[str] = "datasets",
+        root: str = "datasets",
         transform: Optional[Callable] = None,
         pre_transform: Optional[Callable] = None,
         download: Optional[bool] = True,
