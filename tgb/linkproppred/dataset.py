@@ -218,13 +218,13 @@ class LinkPropPredDataset(object):
             raise ValueError(f"Dataset {self.name} url not found, download not supported yet.")
         else:
             r = requests.get(self.url, stream=True)
-            # download_dir = self.root + "/" + "download"
             if osp.isdir(self.root):
                 vprint("Dataset directory is ", self.root)
             else:
                 os.makedirs(self.root)
 
             path_download = self.root + "/" + self.name + ".zip"
+            print(f"downloading Dataset: {self.name} to {path_download}")
             with open(path_download, "wb") as f:
                 total_length = int(r.headers.get("content-length"))
                 for chunk in progress.bar(
