@@ -113,6 +113,7 @@ class LinkPropPredDataset(object):
 
         # for tkg and thg
         self._edge_type = None
+        self._edge_type_ids = None
 
         #tkgl-wikidata and tkgl-smallpedia only
         self._static_data = None
@@ -266,6 +267,7 @@ class LinkPropPredDataset(object):
 
         OUT_DF = self.root + "/" + "ml_{}.pkl".format(self.name)
         OUT_EDGE_FEAT = self.root + "/" + "ml_{}.pkl".format(self.name + "_edge")
+        OUT_EDGE_TYPE = self.root + "/" + "ml_{}.pkl".format(self.name + "_edgetype")
         OUT_NODE_ID = self.root + "/" + "ml_{}.pkl".format(self.name + "_nodeid")
         if self.meta_dict["nodefile"] is not None:
             OUT_NODE_FEAT = self.root + "/" + "ml_{}.pkl".format(self.name + "_node")
@@ -278,6 +280,8 @@ class LinkPropPredDataset(object):
             edge_feat = load_pkl(OUT_EDGE_FEAT)
             if (self.name == "tkgl-wikidata") or (self.name == "tkgl-smallpedia"):
                 node_id = load_pkl(OUT_NODE_ID)
+                edge_type_ids = load_pkl(OUT_EDGE_TYPE)
+                self._edge_type_ids = edge_type_ids
                 self._node_id = node_id
             if self.meta_dict["nodefile"] is not None:
                 node_feat = load_pkl(OUT_NODE_FEAT)
@@ -312,12 +316,17 @@ class LinkPropPredDataset(object):
             elif self.name == "tkgl-yago":
                 df, edge_feat, node_ids = csv_to_tkg_data(self.meta_dict["fname"])
             elif self.name == "tkgl-wikidata":
-                df, edge_feat, node_ids = csv_to_wikidata(self.meta_dict["fname"])
+                df, edge_feat, node_ids, edge_type_ids = csv_to_wikidata(self.meta_dict["fname"])
                 save_pkl(node_ids, OUT_NODE_ID)
+                save_pkl(edge_type_ids, OUT_EDGE_TYPE)
                 self._node_id = node_ids
+                self._edge_type_ids = edge_type_ids
             elif self.name == "tkgl-smallpedia":
-                df, edge_feat, node_ids = csv_to_wikidata(self.meta_dict["fname"])
+                df, edge_feat, node_ids, edge_type_ids = csv_to_wikidata(self.meta_dict["fname"])
                 save_pkl(node_ids, OUT_NODE_ID)
+                save_pkl(edge_type_ids, OUT_EDGE_TYPE)
+                self._node_id = node_ids
+                self._edge_type_ids = edge_type_ids
                 self._node_id = node_ids
             elif self.name == "thgl-myket":
                 df, edge_feat, node_ids = csv_to_thg_data(self.meta_dict["fname"])
@@ -439,7 +448,7 @@ class LinkPropPredDataset(object):
                 self._static_data = static_dict
             else:
                 vprint("file not processed, generating processed file")
-                static_dict, node_ids =  csv_to_staticdata(self.meta_dict["staticfile"], self._node_id)
+                static_dict, node_ids, edge_type_ids =  csv_to_staticdata(self.meta_dict["staticfile"], self._node_id, self._edge_type_ids)
                 save_pkl(static_dict, OUT_DF)
                 self._static_data = static_dict
         else:
