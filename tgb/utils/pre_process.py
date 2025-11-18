@@ -292,6 +292,9 @@ def csv_to_staticdata(
     u_list = np.zeros(num_lines)
     i_list = np.zeros(num_lines)
     edge_type = np.zeros(num_lines)
+
+    num_static_edge_types = len(edge_type_ids)*2  # (to take into account inverse edge types as well)
+    num_new_edge_types = 0
     # edge_type_ids = {}
     out_dict = {}
 
@@ -312,7 +315,9 @@ def csv_to_staticdata(
                 if dst not in node_ids:
                     node_ids[dst] = len(node_ids)
                 if relation not in edge_type_ids:
-                    edge_type_ids[relation] = len(edge_type_ids)
+                    # edge_type_ids[relation] = len(edge_type_ids) # this is wrong. we need to account for inverse edge types as well
+                    edge_type_ids[relation] = num_static_edge_types + num_new_edge_types
+                    num_new_edge_types += 1
                 u = node_ids[src]
                 i = node_ids[dst]
                 u_list[idx - 1] = u
